@@ -64,8 +64,6 @@ looker.plugins.visualizations.add({
         .pop-card{
           width:100%;
           height:100%;
-          border:1px solid #d9dce1;
-          border-radius:12px;
           padding:14px 16px;
           background:#fff;
           display:flex;
@@ -75,17 +73,11 @@ looker.plugins.visualizations.add({
 
         .pop-header{
           display:flex;
-          justify-content:space-between;
+          justify-content:flex-start;
           align-items:center;
           color:#16325c;
           font-weight:700;
           margin-bottom:18px;
-        }
-
-        .dots{
-          color:#7a869a;
-          font-size:20px;
-          line-height:1;
         }
 
         .kpi{
@@ -128,7 +120,6 @@ looker.plugins.visualizations.add({
       <div class="pop-card">
         <div class="pop-header">
           <div id="title"></div>
-          <div class="dots">•••</div>
         </div>
 
         <div id="kpi" class="kpi"></div>
@@ -156,22 +147,16 @@ looker.plugins.visualizations.add({
       data.forEach(row => {
         const label = dimensionName ? row[dimensionName].value : "";
 
-        if (label === "Selected Period") {
-          selectedVal = row[measureName].value;
-        }
-
-        if (label === "Previous Period") {
-          previousVal = row[measureName].value;
-        }
+        if (label === "Selected Period") selectedVal = row[measureName].value;
+        if (label === "Previous Period") previousVal = row[measureName].value;
       });
 
       if (selectedVal === null) selectedVal = 0;
       if (previousVal === null) previousVal = 0;
 
-      const pct =
-        previousVal === 0
-          ? null
-          : ((selectedVal - previousVal) / previousVal) * 100;
+      const pct = previousVal === 0
+        ? null
+        : ((selectedVal - previousVal) / previousVal) * 100;
 
       const positiveBad = config.positive_values_bad;
       const isPositive = pct >= 0;
@@ -187,8 +172,7 @@ looker.plugins.visualizations.add({
       const footer = element.querySelector("#footer");
 
       const arrow = pct >= 0 ? "▲" : "▼";
-      const absPct =
-        pct === null ? "--" : Math.abs(pct).toFixed(1) + "%";
+      const absPct = pct === null ? "--" : Math.abs(pct).toFixed(1) + "%";
 
       badge.className = "badge " + (good ? "up" : "down");
       badge.innerHTML = `${arrow} ${absPct}`;
@@ -199,28 +183,22 @@ looker.plugins.visualizations.add({
       kpi.innerText = formatNumber(selectedVal);
       kpi.style.fontSize = (config.kpi_font_size || 52) + "px";
 
-      compareText.innerText =
-        "vs " + detectLabel(data, queryResponse);
-
-      compareText.style.fontSize =
-        (config.compare_font_size || 16) + "px";
+      compareText.innerText = "vs " + detectLabel(queryResponse);
+      compareText.style.fontSize = (config.compare_font_size || 16) + "px";
 
       if (config.show_footer) {
         footer.style.display = "block";
-        footer.innerText =
-          "Prior: " + formatNumber(previousVal);
-        footer.style.fontSize =
-          (config.footer_font_size || 16) + "px";
+        footer.innerText = "Prior: " + formatNumber(previousVal);
+        footer.style.fontSize = (config.footer_font_size || 16) + "px";
       } else {
         footer.style.display = "none";
       }
 
       done();
+
     } catch (err) {
       element.innerHTML =
-        "<div style='padding:12px;color:red;'>Error: " +
-        err.message +
-        "</div>";
+        "<div style='padding:12px;color:red;'>Error: " + err.message + "</div>";
       done();
     }
 
@@ -228,24 +206,15 @@ looker.plugins.visualizations.add({
       return Number(x || 0).toLocaleString("en-US");
     }
 
-    function detectLabel(data, queryResponse) {
+    function detectLabel(queryResponse) {
       try {
-        const filters = queryResponse.sql || "";
+        const txt = JSON.stringify(queryResponse).toLowerCase();
 
-        if (filters.toLowerCase().includes("last year"))
-          return "prior year";
-
-        if (filters.toLowerCase().includes("last quarter"))
-          return "prior quarter";
-
-        if (filters.toLowerCase().includes("last month"))
-          return "prior month";
-
-        if (filters.toLowerCase().includes("previous period"))
-          return "previous period";
-
-        if (filters.toLowerCase().includes("custom"))
-          return "comparison period";
+        if (txt.includes("last year")) return "prior year";
+        if (txt.includes("last quarter")) return "prior quarter";
+        if (txt.includes("last month")) return "prior month";
+        if (txt.includes("previous period")) return "previous period";
+        if (txt.includes("custom")) return "comparison period";
 
         return "prior period";
       } catch (e) {
