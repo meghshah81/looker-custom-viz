@@ -203,7 +203,7 @@ looker.plugins.visualizations.add({
         badge.innerText = "--";
       } else {
         const arrow = pct >= 0 ? "▲" : "▼";
-        badge.innerText = arrow + " " + Math.abs(pct).toFixed(1) + "%";
+        badge.innerText = arrow + " " + Math.abs(pct).toFixed(2) + "%";
       }
 
       badge.className = "badge " + (good ? "up" : "down");
