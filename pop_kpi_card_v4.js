@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "pop_kpi_card_v3",
-  label: "POP KPI Card v3",
+  id: "pop_kpi_card_v4",
+  label: "POP KPI Card v4",
 
   options: {
     card_title: {
