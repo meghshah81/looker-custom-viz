@@ -236,19 +236,26 @@ looker.plugins.visualizations.add({
     }
 
     function detectLabel(queryResponse) {
-      try {
-        const txt = JSON.stringify(queryResponse).toLowerCase();
+  try {
+    // Read actual applied filters
+    const filters = queryResponse.filters || {};
 
-        if (txt.includes("last year")) return "prior year";
-        if (txt.includes("last quarter")) return "prior quarter";
-        if (txt.includes("last month")) return "prior month";
-        if (txt.includes("previous period")) return "previous period";
-        if (txt.includes("custom")) return "comparison period";
+    for (const key in filters) {
+      const val = String(filters[key]).toLowerCase();
 
-        return "prior period";
-      } catch (e) {
-        return "prior period";
-      }
+      if (val.includes("last year")) return "prior year";
+      if (val.includes("last quarter")) return "prior quarter";
+      if (val.includes("last month")) return "prior month";
+      if (val.includes("previous period")) return "previous period";
+      if (val.includes("custom period")) return "comparison period";
     }
+
+    // fallback
+    return "prior period";
+
+  } catch (e) {
+    return "prior period";
+  }
+}
   }
 });
