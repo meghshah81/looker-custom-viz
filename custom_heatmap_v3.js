@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "custom_heatmap_v2",
-  label: "Custom Heatmap v2",
+  id: "custom_heatmap_v3",
+  label: "Custom Heatmap v3",
 
   options: {
     chart_title: {
@@ -9,41 +9,75 @@ looker.plugins.visualizations.add({
       default: "Slot Utilization Heatmap",
       section: "Style"
     },
+
     chart_subtitle: {
       type: "string",
       label: "Subtitle",
       default: "By Clinic and Hour of Day",
       section: "Style"
     },
+
     low_label: {
       type: "string",
       label: "Low Legend Label",
       default: "LOW UTILIZATION",
       section: "Legend"
     },
+
     high_label: {
       type: "string",
       label: "High Legend Label",
       default: "HIGH UTILIZATION",
       section: "Legend"
     },
+
     low_color: {
       type: "string",
       label: "Low Color",
       default: "#f5efe6",
       section: "Colors"
     },
+
     mid_color: {
       type: "string",
       label: "Mid Color",
       default: "#f4b266",
       section: "Colors"
     },
+
     high_color: {
       type: "string",
       label: "High Color",
       default: "#ff6b00",
       section: "Colors"
+    },
+
+    show_values: {
+      type: "boolean",
+      label: "Show Values on Tiles",
+      default: false,
+      section: "Values"
+    },
+
+    value_font_size: {
+      type: "number",
+      label: "Tile Value Font Size",
+      default: 12,
+      section: "Values"
+    },
+
+    font_family: {
+      type: "string",
+      label: "Font Family",
+      default: "Roboto, Arial, sans-serif",
+      section: "Style"
+    },
+
+    value_text_color: {
+      type: "string",
+      label: "Tile Text Color",
+      default: "#111827",
+      section: "Values"
     }
   },
 
@@ -54,10 +88,22 @@ looker.plugins.visualizations.add({
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
     try {
+      const font = config.font_family || "Roboto, Arial, sans-serif";
+
       element.innerHTML = `
         <style>
-          *{box-sizing:border-box;font-family:Roboto,Arial,sans-serif;}
-          .wrap{padding:18px;background:#fff;}
+          *{
+            box-sizing:border-box;
+            font-family:${font};
+          }
+
+          .wrap{
+            padding:18px;
+            background:#fff;
+            width:100%;
+            height:100%;
+          }
+
           .top{
             display:flex;
             justify-content:space-between;
@@ -66,8 +112,19 @@ looker.plugins.visualizations.add({
             gap:20px;
             flex-wrap:wrap;
           }
-          .title{font-size:28px;font-weight:700;color:#1f2937;}
-          .subtitle{font-size:16px;color:#6b7280;margin-top:4px;}
+
+          .title{
+            font-size:28px;
+            font-weight:700;
+            color:#1f2937;
+          }
+
+          .subtitle{
+            font-size:16px;
+            color:#6b7280;
+            margin-top:4px;
+          }
+
           .legend{
             display:flex;
             align-items:center;
@@ -77,33 +134,43 @@ looker.plugins.visualizations.add({
             color:#6b7280;
             font-weight:600;
           }
+
           .box{
-            width:16px;height:16px;border-radius:2px;
+            width:16px;
+            height:16px;
+            border-radius:2px;
           }
+
           .grid{
             display:grid;
             gap:3px;
           }
+
           .cell{
             min-height:38px;
             display:flex;
             align-items:center;
             justify-content:center;
             padding:4px;
-            font-size:12px;
             border-radius:2px;
+            font-size:${config.value_font_size || 12}px;
+            color:${config.value_text_color || "#111827"};
+            font-weight:500;
+            text-align:center;
           }
+
           .header{
             background:transparent !important;
-            color:#6b7280;
+            color:#6b7280 !important;
             font-weight:600;
           }
+
           .row{
             background:transparent !important;
             justify-content:flex-start;
             font-size:14px;
-            color:#111827;
-            font-weight:500;
+            color:#111827 !important;
+            font-weight:600;
             padding-left:8px;
           }
         </style>
@@ -116,6 +183,7 @@ looker.plugins.visualizations.add({
             </div>
             <div class="legend" id="legend"></div>
           </div>
+
           <div class="grid" id="grid"></div>
         </div>
       `;
@@ -146,6 +214,7 @@ looker.plugins.visualizations.add({
         `180px repeat(${pivotKeys.length}, minmax(70px,1fr))`;
 
       addCell("", "header");
+
       pivotLabels.forEach(h => addCell(h, "header"));
 
       data.forEach(row => {
@@ -158,6 +227,10 @@ looker.plugins.visualizations.add({
           const div = document.createElement("div");
           div.className = "cell";
           div.style.background = color(val, min, max);
+
+          if (config.show_values && val != null) {
+            div.innerText = formatValue(val);
+          }
 
           grid.appendChild(div);
         });
@@ -175,11 +248,15 @@ looker.plugins.visualizations.add({
 
       function renderLegend() {
         const steps = [];
+
         for (let i = 0; i < 6; i++) {
           const ratio = i / 5;
           const val = min + (max - min) * ratio;
+
           steps.push(
-            '<div class="box" style="background:' + color(val, min, max) + '"></div>'
+            '<div class="box" style="background:' +
+              color(val, min, max) +
+              '"></div>'
           );
         }
 
@@ -189,8 +266,19 @@ looker.plugins.visualizations.add({
           ` ${config.high_label || "HIGH"}`;
       }
 
+      function formatValue(v) {
+        if (v == null) return "";
+
+        if (Math.abs(v) <= 1) {
+          return (v * 100).toFixed(1) + "%";
+        }
+
+        return Number(v).toLocaleString("en-US");
+      }
+
       function color(v, min, max) {
         if (v == null) return "#f3f4f6";
+
         const ratio = max === min ? 0.5 : (v - min) / (max - min);
 
         if (ratio <= 0.5) {
@@ -201,18 +289,23 @@ looker.plugins.visualizations.add({
       }
 
       function mix(a, b, t) {
-        const c1 = rgb(a), c2 = rgb(b);
+        const c1 = rgb(a);
+        const c2 = rgb(b);
+
         const r = Math.round(c1.r + (c2.r - c1.r) * t);
         const g = Math.round(c1.g + (c2.g - c1.g) * t);
         const bl = Math.round(c1.b + (c2.b - c1.b) * t);
+
         return `rgb(${r},${g},${bl})`;
       }
 
       function rgb(hex) {
         hex = hex.replace("#", "");
+
         if (hex.length === 3) {
           hex = hex.split("").map(x => x + x).join("");
         }
+
         return {
           r: parseInt(hex.substring(0,2),16),
           g: parseInt(hex.substring(2,4),16),
@@ -222,7 +315,10 @@ looker.plugins.visualizations.add({
 
     } catch (e) {
       element.innerHTML =
-        "<div style='padding:12px;color:red'>Error: " + e.message + "</div>";
+        "<div style='padding:12px;color:red'>Error: " +
+        e.message +
+        "</div>";
+
       done();
     }
   }
