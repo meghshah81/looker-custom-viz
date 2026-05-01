@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
   id: "kpi_with_target",
-  label: "KPI - PoP and Target Bullet",
+  label: "KPI with Target",
 
   options: {
     scale_mode: {
