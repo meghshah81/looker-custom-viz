@@ -1,5 +1,5 @@
 looker.plugins.visualizations.add({
-  id: "kpi_full_bullet_3measure",
+  id: "kpi_with_target",
   label: "KPI - PoP and Target Bullet",
 
   options: {
