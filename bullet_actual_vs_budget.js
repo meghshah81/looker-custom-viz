@@ -25,6 +25,12 @@ looker.plugins.visualizations.add({
       type: "number",
       label: "Row Spacing",
       default: 18
+    },
+
+    show_legend: {
+      type: "boolean",
+      label: "Show Legend",
+      default: true
     }
   },
 
@@ -68,18 +74,46 @@ looker.plugins.visualizations.add({
         }
 
         .values {
-          width: 160px;
+          width: 170px;
           text-align: right;
           font-size: 14px;
         }
 
         .green { color: #16a34a; }
         .red { color: #dc2626; }
+
+        .legend {
+          display: flex;
+          align-items: center;
+          gap: 18px;
+          margin-top: 14px;
+          font-size: 13px;
+          color: #374151;
+        }
+
+        .legend-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .box {
+          width: 12px;
+          height: 12px;
+          border-radius: 3px;
+        }
+
+        .line {
+          width: 14px;
+          height: 2px;
+          background: #111827;
+        }
       </style>
 
       <div class="wrap">
         <div id="title" class="title"></div>
         <div id="chart"></div>
+        <div id="legend" class="legend"></div>
       </div>
     `;
   },
@@ -96,14 +130,13 @@ looker.plugins.visualizations.add({
 
       const titleEl = element.querySelector("#title");
       const chartEl = element.querySelector("#chart");
+      const legendEl = element.querySelector("#legend");
 
-      // Title config
       titleEl.innerText = config.custom_title || "Budget vs Actual";
       titleEl.style.fontSize = (config.title_font_size || 18) + "px";
 
       chartEl.innerHTML = "";
 
-      // Get max for scaling
       let globalMax = 0;
 
       data.forEach(row => {
@@ -112,7 +145,7 @@ looker.plugins.visualizations.add({
         globalMax = Math.max(globalMax, actual, budget);
       });
 
-      globalMax = globalMax * 1.15; // buffer
+      globalMax = globalMax * 1.15;
 
       const barHeight = config.bar_height || 14;
       const spacing = config.row_spacing || 18;
@@ -156,6 +189,29 @@ looker.plugins.visualizations.add({
 
         chartEl.appendChild(rowEl);
       });
+
+      // ✅ Legend
+      if (config.show_legend) {
+        legendEl.innerHTML = `
+          <div class="legend-item">
+            <div class="box" style="background:#22c55e;"></div>
+            <span>Actual ≥ Budget</span>
+          </div>
+
+          <div class="legend-item">
+            <div class="box" style="background:#ef4444;"></div>
+            <span>Actual < Budget</span>
+          </div>
+
+          <div class="legend-item">
+            <div class="line"></div>
+            <span>Budget</span>
+          </div>
+        `;
+        legendEl.style.display = "flex";
+      } else {
+        legendEl.style.display = "none";
+      }
 
       function format(num) {
         if (!num && num !== 0) return "—";
