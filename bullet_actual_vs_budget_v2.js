@@ -1,5 +1,5 @@
 looker.plugins.visualizations.add({
-  id: "bullet_actual_vs_budget",
+  id: "bullet_actual_vs_budget_v2",
   label: "Bullet Chart (Actual vs Budget)",
 
   options: {
