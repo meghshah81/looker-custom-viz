@@ -1,3 +1,9 @@
+// =====================================================
+// LOOKER CUSTOM VISUALIZATION
+// Pivot Hierarchy Matrix
+// Production Ready Version
+// =====================================================
+
 function loadScript(url) {
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
@@ -10,8 +16,9 @@ function loadScript(url) {
 
 looker.plugins.visualizations.add({
 
-  id: "pivot_hierarchy_matrix_v1",
-  label: "Pivot Hierarchy Matrix v1",
+  id: "pivot_hierarchy_matrix_v2",
+
+  label: "Pivot Hierarchy Matrix v2",
 
   options: {
 
@@ -87,24 +94,44 @@ looker.plugins.visualizations.add({
           --ag-font-family: Arial, sans-serif;
         }
 
-        .ag-header-cell-label {
+        .ag-root-wrapper {
+          border-radius: 8px;
+          border: 1px solid #d9d9d9;
+        }
+
+        .ag-header-group-cell {
           font-weight: 700;
+          background: #9b6468;
+          color: white;
+        }
+
+        .ag-header-cell {
+          font-weight: 700;
+        }
+
+        .ag-row-group-indent-0 {
+          font-weight: 700;
+        }
+
+        .ag-pinned-right-header {
+          background: #9b6468;
+          color: white;
         }
 
         .ag-row-group {
           font-weight: 700;
         }
 
-        .ag-pinned-right-cols-container {
-          font-weight: bold;
-        }
-
       </style>
 
-      <div id="pivot-grid" class="ag-theme-alpine"></div>
+      <div
+        id="pivot-grid"
+        class="ag-theme-alpine"
+      ></div>
     `;
 
-    this.gridDiv = element.querySelector("#pivot-grid");
+    this.gridDiv =
+      element.querySelector("#pivot-grid");
 
     this.initialized = false;
 
@@ -122,17 +149,25 @@ looker.plugins.visualizations.add({
 
     try {
 
+      // ==========================================
+      // LOAD AG GRID
+      // ==========================================
+
       if (!this.initialized) {
 
         await loadScript(
           "https://cdn.jsdelivr.net/npm/ag-grid-enterprise/dist/ag-grid-enterprise.min.js"
         );
 
-        // OPTIONAL LICENSE KEY
-        // agGrid.LicenseManager.setLicenseKey("YOUR_LICENSE_KEY");
+        // OPTIONAL LICENSE
+        // agGrid.LicenseManager.setLicenseKey("YOUR_KEY");
 
         this.initialized = true;
       }
+
+      // ==========================================
+      // VALIDATION
+      // ==========================================
 
       const dimensions =
         queryResponse.fields.dimensions || [];
@@ -161,6 +196,10 @@ looker.plugins.visualizations.add({
         );
       }
 
+      // ==========================================
+      // GET PIVOT VALUES
+      // ==========================================
+
       const pivotKeys = [];
 
       pivots.forEach(pivot => {
@@ -171,30 +210,57 @@ looker.plugins.visualizations.add({
 
       });
 
+      // ==========================================
+      // BUILD ROW DATA
+      // ==========================================
+
       const rowData = [];
 
       data.forEach(row => {
 
         const rowObj = {};
 
+        // --------------------------------------
+        // DIMENSIONS
+        // --------------------------------------
+
         dimensions.forEach(dim => {
 
           rowObj[dim.name] =
             row[dim.name]
               ? row[dim.name].value
-              : null;
+              : "";
 
         });
+
+        // --------------------------------------
+        // MEASURES
+        // --------------------------------------
 
         measures.forEach(measure => {
 
           pivotKeys.forEach(pivotKey => {
 
-            const value =
+            let value = 0;
+
+            if (
               row[measure.name] &&
               row[measure.name][pivotKey]
-                ? row[measure.name][pivotKey].value
-                : null;
+            ) {
+
+              value =
+                row[measure.name][pivotKey]
+                  .value;
+
+              if (
+                value === null ||
+                value === undefined ||
+                value === ""
+              ) {
+                value = 0;
+              }
+
+            }
 
             rowObj[
               `${measure.name}|${pivotKey}`
@@ -202,9 +268,15 @@ looker.plugins.visualizations.add({
 
           });
 
+          // ----------------------------------
+          // ROW TOTALS
+          // ----------------------------------
+
           if (
             row[measure.name] &&
-            row[measure.name]["$$$_row_total_$$$"]
+            row[measure.name][
+              "$$$_row_total_$$$"
+            ]
           ) {
 
             rowObj[
@@ -222,11 +294,15 @@ looker.plugins.visualizations.add({
 
       });
 
+      // ==========================================
+      // BUILD COLUMNS
+      // ==========================================
+
       const columnDefs = [];
 
-      // =================================================
+      // ------------------------------------------
       // ROW GROUP DIMENSIONS
-      // =================================================
+      // ------------------------------------------
 
       dimensions.forEach(dim => {
 
@@ -239,17 +315,15 @@ looker.plugins.visualizations.add({
 
           rowGroup: true,
 
-          hide: true,
-
-          width: 240
+          hide: true
 
         });
 
       });
 
-      // =================================================
-      // PIVOT COLUMNS
-      // =================================================
+      // ------------------------------------------
+      // PIVOTED COLUMNS
+      // ------------------------------------------
 
       pivotKeys.forEach(pivotKey => {
 
@@ -266,7 +340,7 @@ looker.plugins.visualizations.add({
               measure.label_short ||
               measure.label,
 
-            width: 130,
+            width: 120,
 
             sortable: true,
 
@@ -289,6 +363,10 @@ looker.plugins.visualizations.add({
                 (measure.label || "")
                   .toLowerCase();
 
+              // ------------------------------
+              // PERCENT FORMATTING
+              // ------------------------------
+
               if (
                 label.includes("rate") ||
                 label.includes("%") ||
@@ -307,24 +385,29 @@ looker.plugins.visualizations.add({
 
             },
 
-            cellStyle: params => {
+            // ------------------------------
+            // SUBTOTAL STYLING
+            // ------------------------------
 
-              const style = {};
+            cellStyle: params => {
 
               if (params.node.group) {
 
-                style.backgroundColor =
-                  config.subtotal_background;
+                return {
 
-                style.color =
-                  config.subtotal_foreground;
+                  backgroundColor:
+                    config.subtotal_background,
 
-                style.fontWeight =
-                  "bold";
+                  color:
+                    config.subtotal_foreground,
+
+                  fontWeight: "bold"
+
+                };
 
               }
 
-              return style;
+              return {};
 
             }
 
@@ -334,7 +417,9 @@ looker.plugins.visualizations.add({
 
         columnDefs.push({
 
-          headerName: pivotKey,
+          headerName:
+            String(pivotKey)
+              .split("|")[0],
 
           children: childColumns
 
@@ -342,9 +427,9 @@ looker.plugins.visualizations.add({
 
       });
 
-      // =================================================
+      // ==========================================
       // ROW TOTALS
-      // =================================================
+      // ==========================================
 
       if (config.show_row_totals) {
 
@@ -363,7 +448,7 @@ looker.plugins.visualizations.add({
 
             pinned: "right",
 
-            width: 140,
+            width: 130,
 
             sortable: true,
 
@@ -430,9 +515,9 @@ looker.plugins.visualizations.add({
 
       }
 
-      // =================================================
+      // ==========================================
       // COLUMN TOTALS
-      // =================================================
+      // ==========================================
 
       let pinnedBottomRowData = [];
 
@@ -445,6 +530,10 @@ looker.plugins.visualizations.add({
           totalRow[dim.name] = "Total";
 
         });
+
+        // --------------------------------------
+        // PIVOT TOTALS
+        // --------------------------------------
 
         pivotKeys.forEach(pivotKey => {
 
@@ -467,6 +556,10 @@ looker.plugins.visualizations.add({
           });
 
         });
+
+        // --------------------------------------
+        // GRAND TOTALS
+        // --------------------------------------
 
         measures.forEach(measure => {
 
@@ -492,9 +585,9 @@ looker.plugins.visualizations.add({
 
       }
 
-      // =================================================
+      // ==========================================
       // GRID OPTIONS
-      // =================================================
+      // ==========================================
 
       const gridOptions = {
 
@@ -508,20 +601,15 @@ looker.plugins.visualizations.add({
 
         suppressAggFuncInHeader: true,
 
-        groupDisplayType:
-          "multipleColumns",
-
-        groupDefaultExpanded: 0,
+        rowSelection: "multiple",
 
         suppressRowClickSelection: true,
 
-        rowSelection: "multiple",
+        groupDefaultExpanded: 0,
 
-        enableRangeSelection: true,
+        groupDisplayType: "singleColumn",
 
         groupIncludeFooter: true,
-
-        groupIncludeTotalFooter: false,
 
         pinnedBottomRowData:
           pinnedBottomRowData,
@@ -535,6 +623,10 @@ looker.plugins.visualizations.add({
           resizable: true
 
         },
+
+        // ======================================
+        // HIERARCHY COLUMN
+        // ======================================
 
         autoGroupColumnDef: {
 
@@ -550,9 +642,48 @@ looker.plugins.visualizations.add({
 
             suppressCount: true
 
+          },
+
+          valueGetter: params => {
+
+            if (
+              params.node &&
+              params.node.key
+            ) {
+              return params.node.key;
+            }
+
+            return "";
+
+          },
+
+          cellStyle: params => {
+
+            if (params.node.group) {
+
+              return {
+
+                fontWeight: "bold",
+
+                backgroundColor:
+                  config.subtotal_background,
+
+                color:
+                  config.subtotal_foreground
+
+              };
+
+            }
+
+            return {};
+
           }
 
         },
+
+        // ======================================
+        // COLUMN TOTAL STYLING
+        // ======================================
 
         getRowStyle: params => {
 
@@ -578,9 +709,9 @@ looker.plugins.visualizations.add({
 
       };
 
-      // =================================================
-      // DESTROY PREVIOUS GRID
-      // =================================================
+      // ==========================================
+      // DESTROY OLD GRID
+      // ==========================================
 
       if (this.gridApi) {
 
@@ -588,14 +719,15 @@ looker.plugins.visualizations.add({
 
       }
 
-      // =================================================
+      // ==========================================
       // CREATE GRID
-      // =================================================
+      // ==========================================
 
-      this.gridApi = agGrid.createGrid(
-        this.gridDiv,
-        gridOptions
-      );
+      this.gridApi =
+        agGrid.createGrid(
+          this.gridDiv,
+          gridOptions
+        );
 
       doneRendering();
 
@@ -609,8 +741,13 @@ looker.plugins.visualizations.add({
           color:red;
           font-family:Arial;
         ">
-          <h3>Error Rendering Visualization</h3>
-          <pre>${err}</pre>
+          <h3>
+            Error Rendering Visualization
+          </h3>
+
+          <pre>
+${err}
+          </pre>
         </div>
       `;
 
