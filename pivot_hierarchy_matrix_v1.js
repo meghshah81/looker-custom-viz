@@ -10,8 +10,8 @@ function loadScript(url) {
 
 looker.plugins.visualizations.add({
 
-  id: "pivot_hierarchy_matrix",
-  label: "Pivot Hierarchy Matrix",
+  id: "pivot_hierarchy_matrix_v1",
+  label: "Pivot Hierarchy Matrix v1",
 
   options: {
 
@@ -74,6 +74,7 @@ looker.plugins.visualizations.add({
           margin: 0;
           padding: 0;
           overflow: hidden;
+          font-family: Arial, sans-serif;
         }
 
         #pivot-grid {
@@ -94,7 +95,7 @@ looker.plugins.visualizations.add({
           font-weight: 700;
         }
 
-        .total-column {
+        .ag-pinned-right-cols-container {
           font-weight: bold;
         }
 
@@ -106,6 +107,8 @@ looker.plugins.visualizations.add({
     this.gridDiv = element.querySelector("#pivot-grid");
 
     this.initialized = false;
+
+    this.gridApi = null;
   },
 
   updateAsync: async function(
@@ -125,46 +128,62 @@ looker.plugins.visualizations.add({
           "https://cdn.jsdelivr.net/npm/ag-grid-enterprise/dist/ag-grid-enterprise.min.js"
         );
 
-        // OPTIONAL LICENSE
+        // OPTIONAL LICENSE KEY
         // agGrid.LicenseManager.setLicenseKey("YOUR_LICENSE_KEY");
 
         this.initialized = true;
       }
 
-      const dimensions = queryResponse.fields.dimensions || [];
-      const measures = queryResponse.fields.measures || [];
-      const pivots = queryResponse.pivots || [];
+      const dimensions =
+        queryResponse.fields.dimensions || [];
+
+      const measures =
+        queryResponse.fields.measures || [];
+
+      const pivots =
+        queryResponse.pivots || [];
 
       if (dimensions.length === 0) {
-        throw new Error("At least one dimension is required.");
-      }
-
-      if (pivots.length === 0) {
-        throw new Error("Please pivot at least one field.");
+        throw new Error(
+          "At least one dimension is required."
+        );
       }
 
       if (measures.length === 0) {
-        throw new Error("At least one measure is required.");
+        throw new Error(
+          "At least one measure is required."
+        );
+      }
+
+      if (pivots.length === 0) {
+        throw new Error(
+          "Please pivot at least one field."
+        );
       }
 
       const pivotKeys = [];
 
-      pivots.forEach(p => {
-        if (p.key) {
-          pivotKeys.push(p.key);
+      pivots.forEach(pivot => {
+
+        if (pivot.key) {
+          pivotKeys.push(pivot.key);
         }
+
       });
 
       const rowData = [];
 
       data.forEach(row => {
 
-        const obj = {};
+        const rowObj = {};
 
         dimensions.forEach(dim => {
-          obj[dim.name] = row[dim.name]
-            ? row[dim.name].value
-            : null;
+
+          rowObj[dim.name] =
+            row[dim.name]
+              ? row[dim.name].value
+              : null;
+
         });
 
         measures.forEach(measure => {
@@ -177,7 +196,9 @@ looker.plugins.visualizations.add({
                 ? row[measure.name][pivotKey].value
                 : null;
 
-            obj[`${measure.name}|${pivotKey}`] = value;
+            rowObj[
+              `${measure.name}|${pivotKey}`
+            ] = value;
 
           });
 
@@ -186,49 +207,66 @@ looker.plugins.visualizations.add({
             row[measure.name]["$$$_row_total_$$$"]
           ) {
 
-            obj[`${measure.name}_row_total`] =
-              row[measure.name]["$$$_row_total_$$$"].value;
+            rowObj[
+              `${measure.name}_row_total`
+            ] =
+              row[measure.name][
+                "$$$_row_total_$$$"
+              ].value;
 
           }
 
         });
 
-        rowData.push(obj);
+        rowData.push(rowObj);
 
       });
 
       const columnDefs = [];
 
-      dimensions.forEach((dim, index) => {
+      // =================================================
+      // ROW GROUP DIMENSIONS
+      // =================================================
+
+      dimensions.forEach(dim => {
 
         columnDefs.push({
+
           field: dim.name,
-          headerName: dim.label_short || dim.label,
-          rowGroup: index === 0,
-          hide: index === 0,
-          pinned: "left",
-          width: index === 0 ? 280 : 220,
-          cellStyle: {
-            fontWeight: "600"
-          }
+
+          headerName:
+            dim.label_short || dim.label,
+
+          rowGroup: true,
+
+          hide: true,
+
+          width: 240
+
         });
 
       });
 
+      // =================================================
+      // PIVOT COLUMNS
+      // =================================================
+
       pivotKeys.forEach(pivotKey => {
 
-        const childCols = [];
+        const childColumns = [];
 
         measures.forEach(measure => {
 
-          childCols.push({
+          childColumns.push({
 
-            field: `${measure.name}|${pivotKey}`,
+            field:
+              `${measure.name}|${pivotKey}`,
 
             headerName:
-              measure.label_short || measure.label,
+              measure.label_short ||
+              measure.label,
 
-            width: 120,
+            width: 130,
 
             sortable: true,
 
@@ -248,17 +286,25 @@ looker.plugins.visualizations.add({
               }
 
               const label =
-                (measure.label || "").toLowerCase();
+                (measure.label || "")
+                  .toLowerCase();
 
               if (
                 label.includes("rate") ||
                 label.includes("%") ||
                 label.includes("percent")
               ) {
-                return `${Number(params.value).toFixed(0)} %`;
+
+                return `${Number(
+                  params.value
+                ).toFixed(0)} %`;
+
               }
 
-              return Number(params.value).toLocaleString();
+              return Number(
+                params.value
+              ).toLocaleString();
+
             },
 
             cellStyle: params => {
@@ -273,10 +319,13 @@ looker.plugins.visualizations.add({
                 style.color =
                   config.subtotal_foreground;
 
-                style.fontWeight = "bold";
+                style.fontWeight =
+                  "bold";
+
               }
 
               return style;
+
             }
 
           });
@@ -284,24 +333,33 @@ looker.plugins.visualizations.add({
         });
 
         columnDefs.push({
+
           headerName: pivotKey,
-          children: childCols
+
+          children: childColumns
+
         });
 
       });
 
+      // =================================================
+      // ROW TOTALS
+      // =================================================
+
       if (config.show_row_totals) {
 
-        const totalChildren = [];
+        const totalColumns = [];
 
         measures.forEach(measure => {
 
-          totalChildren.push({
+          totalColumns.push({
 
-            field: `${measure.name}_row_total`,
+            field:
+              `${measure.name}_row_total`,
 
             headerName:
-              measure.label_short || measure.label,
+              measure.label_short ||
+              measure.label,
 
             pinned: "right",
 
@@ -313,7 +371,7 @@ looker.plugins.visualizations.add({
 
             resizable: true,
 
-            cellClass: "total-column",
+            aggFunc: "sum",
 
             valueFormatter: params => {
 
@@ -325,20 +383,29 @@ looker.plugins.visualizations.add({
               }
 
               const label =
-                (measure.label || "").toLowerCase();
+                (measure.label || "")
+                  .toLowerCase();
 
               if (
                 label.includes("rate") ||
                 label.includes("%") ||
                 label.includes("percent")
               ) {
-                return `${Number(params.value).toFixed(0)} %`;
+
+                return `${Number(
+                  params.value
+                ).toFixed(0)} %`;
+
               }
 
-              return Number(params.value).toLocaleString();
+              return Number(
+                params.value
+              ).toLocaleString();
+
             },
 
             cellStyle: {
+
               backgroundColor:
                 config.row_total_background,
 
@@ -346,6 +413,7 @@ looker.plugins.visualizations.add({
                 config.row_total_foreground,
 
               fontWeight: "bold"
+
             }
 
           });
@@ -353,11 +421,18 @@ looker.plugins.visualizations.add({
         });
 
         columnDefs.push({
+
           headerName: "Total",
-          children: totalChildren
+
+          children: totalColumns
+
         });
 
       }
+
+      // =================================================
+      // COLUMN TOTALS
+      // =================================================
 
       let pinnedBottomRowData = [];
 
@@ -366,7 +441,9 @@ looker.plugins.visualizations.add({
         const totalRow = {};
 
         dimensions.forEach(dim => {
+
           totalRow[dim.name] = "Total";
+
         });
 
         pivotKeys.forEach(pivotKey => {
@@ -380,7 +457,8 @@ looker.plugins.visualizations.add({
 
             rowData.forEach(r => {
 
-              total += Number(r[field]) || 0;
+              total +=
+                Number(r[field]) || 0;
 
             });
 
@@ -396,13 +474,17 @@ looker.plugins.visualizations.add({
 
           rowData.forEach(r => {
 
-            grandTotal +=
-              Number(r[`${measure.name}_row_total`]) || 0;
+            grandTotal += Number(
+              r[
+                `${measure.name}_row_total`
+              ]
+            ) || 0;
 
           });
 
-          totalRow[`${measure.name}_row_total`] =
-            grandTotal;
+          totalRow[
+            `${measure.name}_row_total`
+          ] = grandTotal;
 
         });
 
@@ -410,39 +492,48 @@ looker.plugins.visualizations.add({
 
       }
 
+      // =================================================
+      // GRID OPTIONS
+      // =================================================
+
       const gridOptions = {
 
         columnDefs: columnDefs,
 
         rowData: rowData,
 
-        treeData: true,
-
         animateRows: true,
-
-        suppressAggFuncInHeader: true,
-
-        groupDefaultExpanded: 0,
-
-        enableRangeSelection: true,
-
-        rowSelection: "multiple",
 
         pagination: false,
 
+        suppressAggFuncInHeader: true,
+
+        groupDisplayType:
+          "multipleColumns",
+
+        groupDefaultExpanded: 0,
+
         suppressRowClickSelection: true,
+
+        rowSelection: "multiple",
+
+        enableRangeSelection: true,
 
         groupIncludeFooter: true,
 
-        groupIncludeTotalFooter:
-          config.show_column_totals,
+        groupIncludeTotalFooter: false,
 
-        pinnedBottomRowData: pinnedBottomRowData,
+        pinnedBottomRowData:
+          pinnedBottomRowData,
 
         defaultColDef: {
+
           sortable: true,
+
           filter: true,
+
           resizable: true
+
         },
 
         autoGroupColumnDef: {
@@ -456,24 +547,10 @@ looker.plugins.visualizations.add({
           pinned: "left",
 
           cellRendererParams: {
+
             suppressCount: true
+
           }
-
-        },
-
-        getDataPath: function(data) {
-
-          const path = [];
-
-          dimensions.forEach(dim => {
-
-            if (data[dim.name]) {
-              path.push(data[dim.name]);
-            }
-
-          });
-
-          return path;
 
         },
 
@@ -501,11 +578,24 @@ looker.plugins.visualizations.add({
 
       };
 
+      // =================================================
+      // DESTROY PREVIOUS GRID
+      // =================================================
+
       if (this.gridApi) {
+
         this.gridApi.destroy();
+
       }
 
-      new agGrid.Grid(this.gridDiv, gridOptions);
+      // =================================================
+      // CREATE GRID
+      // =================================================
+
+      this.gridApi = agGrid.createGrid(
+        this.gridDiv,
+        gridOptions
+      );
 
       doneRendering();
 
@@ -516,8 +606,8 @@ looker.plugins.visualizations.add({
       element.innerHTML = `
         <div style="
           padding:20px;
-          font-family:Arial;
           color:red;
+          font-family:Arial;
         ">
           <h3>Error Rendering Visualization</h3>
           <pre>${err}</pre>
@@ -525,6 +615,7 @@ looker.plugins.visualizations.add({
       `;
 
       doneRendering();
+
     }
 
   }
