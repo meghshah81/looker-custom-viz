@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "pop_kpi_card_v7",
-  label: "POP KPI Card v7",
+  id: "pop_kpi_card_v8",
+  label: "POP KPI Card v8",
 
   options: {
     card_title: {
@@ -54,8 +54,10 @@ looker.plugins.visualizations.add({
   },
 
   create: function (element) {
+
     element.innerHTML = `
       <style>
+
         * {
           box-sizing: border-box;
           font-family: Roboto, Arial, sans-serif;
@@ -174,6 +176,7 @@ looker.plugins.visualizations.add({
           font-weight: 700;
           margin-bottom: 8px;
         }
+
       </style>
 
       <div id="viz-container"></div>
@@ -188,20 +191,28 @@ looker.plugins.visualizations.add({
     details,
     done
   ) {
+
     try {
 
-      // =========================
+      // =====================================================
       // VALIDATION
-      // =========================
+      // =====================================================
 
-      const dimensions = queryResponse.fields.dimension_like || [];
-      const measures = queryResponse.fields.measure_like || [];
+      const dimensions =
+        queryResponse.fields.dimension_like || [];
 
-      if (dimensions.length !== 1 || measures.length !== 1) {
+      const measures =
+        queryResponse.fields.measure_like || [];
+
+      if (
+        dimensions.length !== 1 ||
+        measures.length !== 1
+      ) {
 
         element.querySelector("#viz-container").innerHTML = `
           <div class="validation-error">
             <div class="validation-box">
+
               <div class="validation-title">
                 This visualization requires exactly:
               </div>
@@ -209,6 +220,7 @@ looker.plugins.visualizations.add({
               • 1 Dimension
               <br>
               • 1 Measure
+
             </div>
           </div>
         `;
@@ -217,9 +229,9 @@ looker.plugins.visualizations.add({
         return;
       }
 
-      // =========================
+      // =====================================================
       // FIELD REFERENCES
-      // =========================
+      // =====================================================
 
       const measureName = measures[0].name;
       const dimensionName = dimensions[0].name;
@@ -227,28 +239,32 @@ looker.plugins.visualizations.add({
       let selectedVal = 0;
       let previousVal = 0;
 
-      // =========================
+      // =====================================================
       // READ DATA
-      // =========================
+      // =====================================================
 
       data.forEach(row => {
 
-        const label = row[dimensionName]
-          ? String(row[dimensionName].value || "")
-          : "";
+        const label =
+          row[dimensionName]
+            ? String(row[dimensionName].value || "")
+            : "";
 
         if (label === "Selected Period") {
-          selectedVal = Number(row[measureName].value || 0);
+          selectedVal =
+            Number(row[measureName].value || 0);
         }
 
         if (label === "Previous Period") {
-          previousVal = Number(row[measureName].value || 0);
+          previousVal =
+            Number(row[measureName].value || 0);
         }
+
       });
 
-      // =========================
-      // PERCENT CALCULATION
-      // =========================
+      // =====================================================
+      // PERCENT CHANGE CALCULATION
+      // =====================================================
 
       const pct =
         previousVal === 0
@@ -261,9 +277,9 @@ looker.plugins.visualizations.add({
         (!config.positive_values_bad && isPositive) ||
         (config.positive_values_bad && !isPositive);
 
-      // =========================
+      // =====================================================
       // BUILD HTML
-      // =========================
+      // =====================================================
 
       element.querySelector("#viz-container").innerHTML = `
         <div class="pop-card">
@@ -275,46 +291,64 @@ looker.plugins.visualizations.add({
           <div id="kpi" class="kpi"></div>
 
           <div class="compare-row">
+
             <div id="badge" class="badge"></div>
-            <div id="compareText" class="compare-label"></div>
+
+            <div id="compareText"
+                 class="compare-label">
+            </div>
+
           </div>
 
-          <div id="footer" class="footer"></div>
+          <div id="footer"
+               class="footer">
+          </div>
 
         </div>
       `;
 
-      // =========================
+      // =====================================================
       // ELEMENT REFERENCES
-      // =========================
+      // =====================================================
 
-      const title = element.querySelector("#title");
-      const kpi = element.querySelector("#kpi");
-      const badge = element.querySelector("#badge");
-      const compareText = element.querySelector("#compareText");
-      const footer = element.querySelector("#footer");
+      const title =
+        element.querySelector("#title");
 
-      // =========================
+      const kpi =
+        element.querySelector("#kpi");
+
+      const badge =
+        element.querySelector("#badge");
+
+      const compareText =
+        element.querySelector("#compareText");
+
+      const footer =
+        element.querySelector("#footer");
+
+      // =====================================================
       // TITLE
-      // =========================
+      // =====================================================
 
-      title.innerText = config.card_title || "KPI";
+      title.innerText =
+        config.card_title || "KPI";
 
       title.style.fontSize =
         (config.title_font_size || 18) + "px";
 
-      // =========================
+      // =====================================================
       // KPI VALUE
-      // =========================
+      // =====================================================
 
-      kpi.innerText = formatNumber(selectedVal);
+      kpi.innerText =
+        formatNumber(selectedVal);
 
       kpi.style.fontSize =
         (config.kpi_font_size || 52) + "px";
 
-      // =========================
+      // =====================================================
       // BADGE
-      // =========================
+      // =====================================================
 
       if (pct === null || isNaN(pct)) {
 
@@ -322,7 +356,8 @@ looker.plugins.visualizations.add({
 
       } else {
 
-        const arrow = pct >= 0 ? "▲" : "▼";
+        const arrow =
+          pct >= 0 ? "▲" : "▼";
 
         badge.innerText =
           arrow +
@@ -337,9 +372,9 @@ looker.plugins.visualizations.add({
       badge.style.fontSize =
         (config.compare_font_size || 16) + "px";
 
-      // =========================
+      // =====================================================
       // COMPARISON LABEL
-      // =========================
+      // =====================================================
 
       compareText.innerText =
         "vs " + detectLabel(queryResponse);
@@ -347,16 +382,17 @@ looker.plugins.visualizations.add({
       compareText.style.fontSize =
         (config.compare_font_size || 16) + "px";
 
-      // =========================
+      // =====================================================
       // FOOTER
-      // =========================
+      // =====================================================
 
       if (config.show_footer) {
 
         footer.style.display = "block";
 
         footer.innerText =
-          "Prior: " + formatNumber(previousVal);
+          "Prior: " +
+          formatNumber(previousVal);
 
         footer.style.fontSize =
           (config.footer_font_size || 16) + "px";
@@ -381,31 +417,35 @@ looker.plugins.visualizations.add({
       done();
     }
 
-    // =========================
-    // FORMAT NUMBER
-    // =========================
+    // =====================================================
+    // FORMAT NUMBER / PERCENT
+    // =====================================================
 
     function formatNumber(val) {
 
       const num = Number(val || 0);
-    
-      // Detect percentage-like decimal values
+
+      // Handle percentage measures stored as decimals
       if (Math.abs(num) <= 1) {
-        return (num * 100).toFixed(2) + "%";
+
+        return (
+          (num * 100).toFixed(2) + "%"
+        );
       }
-    
+
       return num.toLocaleString("en-US");
     }
 
-    // =========================
+    // =====================================================
     // DETECT LABEL
-    // =========================
+    // =====================================================
 
     function detectLabel(queryResponse) {
 
       try {
 
-        const filters = queryResponse.filters || {};
+        const filters =
+          queryResponse.filters || {};
 
         for (const key in filters) {
 
@@ -431,6 +471,7 @@ looker.plugins.visualizations.add({
           if (val.includes("custom period")) {
             return "comparison period";
           }
+
         }
 
         return "prior period";
