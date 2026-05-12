@@ -387,7 +387,14 @@ looker.plugins.visualizations.add({
 
     function formatNumber(val) {
 
-      return Number(val || 0).toLocaleString("en-US");
+      const num = Number(val || 0);
+    
+      // Detect percentage-like decimal values
+      if (Math.abs(num) <= 1) {
+        return (num * 100).toFixed(2) + "%";
+      }
+    
+      return num.toLocaleString("en-US");
     }
 
     // =========================
