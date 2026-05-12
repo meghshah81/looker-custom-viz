@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "pop_kpi_card_v8",
-  label: "POP KPI Card v8",
+  id: "pop_kpi_card_v9",
+  label: "POP KPI Card v9",
 
   options: {
     card_title: {
@@ -77,10 +77,6 @@ looker.plugins.visualizations.add({
           display: flex;
           flex-direction: column;
           justify-content: flex-start;
-          border: none !important;
-          border-radius: 0 !important;
-          box-shadow: none !important;
-          outline: none !important;
           overflow: hidden;
         }
 
@@ -239,6 +235,9 @@ looker.plugins.visualizations.add({
       let selectedVal = 0;
       let previousVal = 0;
 
+      let selectedCell = null;
+      let previousCell = null;
+
       // =====================================================
       // READ DATA
       // =====================================================
@@ -251,11 +250,17 @@ looker.plugins.visualizations.add({
             : "";
 
         if (label === "Selected Period") {
+
+          selectedCell = row[measureName];
+
           selectedVal =
             Number(row[measureName].value || 0);
         }
 
         if (label === "Previous Period") {
+
+          previousCell = row[measureName];
+
           previousVal =
             Number(row[measureName].value || 0);
         }
@@ -341,7 +346,7 @@ looker.plugins.visualizations.add({
       // =====================================================
 
       kpi.innerText =
-        formatNumber(selectedVal);
+        formatValue(selectedCell);
 
       kpi.style.fontSize =
         (config.kpi_font_size || 52) + "px";
@@ -392,7 +397,7 @@ looker.plugins.visualizations.add({
 
         footer.innerText =
           "Prior: " +
-          formatNumber(previousVal);
+          formatValue(previousCell);
 
         footer.style.fontSize =
           (config.footer_font_size || 16) + "px";
@@ -418,22 +423,33 @@ looker.plugins.visualizations.add({
     }
 
     // =====================================================
-    // FORMAT NUMBER / PERCENT
+    // FORMAT VALUE
     // =====================================================
 
-    function formatNumber(val) {
+    function formatValue(cell) {
 
-      const num = Number(val || 0);
+      // Use Looker's native rendered value
+      // This preserves:
+      // %
+      // $
+      // commas
+      // decimals
+      // abbreviations etc.
 
-      // Handle percentage measures stored as decimals
-      if (Math.abs(num) <= 1) {
+      if (
+        cell &&
+        cell.rendered !== undefined &&
+        cell.rendered !== null
+      ) {
 
-        return (
-          (num * 100).toFixed(2) + "%"
-        );
+        return cell.rendered;
       }
 
-      return num.toLocaleString("en-US");
+      // fallback
+
+      return Number(
+        cell?.value || 0
+      ).toLocaleString("en-US");
     }
 
     // =====================================================
