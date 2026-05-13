@@ -97,6 +97,7 @@ const Utils = {
 
       if (field == null) return "—";
 
+      // Preserve Looker formatting
       if (
         typeof field === "object" &&
         field.rendered != null
@@ -204,7 +205,6 @@ const Utils = {
 
     const max = Math.max(actual, budget, 1);
 
-    // Better handling for percentages/small numbers
     if (max <= 5) {
       return max * 1.05;
     }
@@ -227,8 +227,8 @@ const Utils = {
 
 looker.plugins.visualizations.add({
 
-  id: "kpi_budget_v3",
-  label: "KPI vs Budget v3",
+  id: "kpi_vs_budget_v4",
+  label: "KPI vs Budget v4",
 
   options: {
 
@@ -482,6 +482,25 @@ looker.plugins.visualizations.add({
         ) * 100;
 
       // =====================================
+      // SMART LABEL ALIGNMENT
+      // =====================================
+
+      let labelTransform =
+        "translateX(-50%)";
+
+      // Near right edge
+      if (targetPosition >= 92) {
+        labelTransform =
+          "translateX(-100%)";
+      }
+
+      // Near left edge
+      if (targetPosition <= 8) {
+        labelTransform =
+          "translateX(0%)";
+      }
+
+      // =====================================
       // AXIS DISPLAY
       // =====================================
 
@@ -574,7 +593,7 @@ looker.plugins.visualizations.add({
           .budget-row{
             display:flex;
             justify-content:space-between;
-            margin-bottom:8px;
+            margin-bottom:18px;
             font-size:14px;
             font-weight:600;
           }
@@ -582,24 +601,34 @@ looker.plugins.visualizations.add({
           .bar-wrap{
             position:relative;
             background:#e5e7eb;
-            border-radius:6px;
+            border-radius:10px;
             overflow:visible;
           }
 
           .bar{
             height:100%;
-            border-radius:6px;
+            border-radius:10px;
           }
 
           .target-line{
             position:absolute;
-            top:-3px;
-            width:2px;
+            top:-5px;
+            width:3px;
             background:#111827;
+            border-radius:2px;
+          }
+
+          .budget-label{
+            position:absolute;
+            top:-34px;
+            font-size:12px;
+            font-weight:600;
+            color:#6b7280;
+            white-space:nowrap;
           }
 
           .axis{
-            margin-top:6px;
+            margin-top:8px;
             display:flex;
             justify-content:space-between;
             font-size:11px;
@@ -607,7 +636,7 @@ looker.plugins.visualizations.add({
           }
 
           .budget-percent{
-            margin-top:8px;
+            margin-top:10px;
             font-size:14px;
             font-weight:600;
           }
@@ -699,10 +728,6 @@ looker.plugins.visualizations.add({
                   ${config.budget_section_text}
                 </div>
 
-                <div style="color:#6b7280;">
-                  ${budgetDisplay}
-                </div>
-
               </div>
             `
             : ""
@@ -717,6 +742,8 @@ looker.plugins.visualizations.add({
             "
           >
 
+            <!-- BAR -->
+
             <div
               class="bar"
               style="
@@ -725,11 +752,25 @@ looker.plugins.visualizations.add({
               "
             ></div>
 
+            <!-- BUDGET LABEL -->
+
+            <div
+              class="budget-label"
+              style="
+                left:${targetPosition}%;
+                transform:${labelTransform};
+              "
+            >
+              ${budgetDisplay}
+            </div>
+
+            <!-- TARGET LINE -->
+
             <div
               class="target-line"
               style="
                 left:${targetPosition}%;
-                height:${(config.bar_height || 12) + 6}px;
+                height:${(config.bar_height || 12) + 12}px;
               "
             ></div>
 
