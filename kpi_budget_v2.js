@@ -49,18 +49,8 @@ const Utils = {
     ) || [];
   },
 
-  getDimensions(queryResponse) {
-
-    return (
-      queryResponse &&
-      queryResponse.fields &&
-      queryResponse.fields.dimension_like
-    ) || [];
-  },
-
   // =========================================
   // NUMERIC VALUE
-  // Used for calculations
   // =========================================
 
   getNumericValue(row, fieldName) {
@@ -71,7 +61,6 @@ const Utils = {
 
       if (field == null) return 0;
 
-      // Standard Looker object
       if (
         typeof field === "object" &&
         field.value != null
@@ -80,15 +69,11 @@ const Utils = {
         return this.cleanNumber(field.value);
       }
 
-      // Primitive number
       if (typeof field === "number") {
-
         return field;
       }
 
-      // Primitive string
       if (typeof field === "string") {
-
         return this.cleanNumber(field);
       }
 
@@ -102,7 +87,6 @@ const Utils = {
 
   // =========================================
   // DISPLAY VALUE
-  // Preserves Looker formatting
   // =========================================
 
   getDisplayValue(row, fieldName) {
@@ -113,7 +97,6 @@ const Utils = {
 
       if (field == null) return "—";
 
-      // Preserve Looker formatting
       if (
         typeof field === "object" &&
         field.rendered != null
@@ -122,7 +105,6 @@ const Utils = {
         return field.rendered;
       }
 
-      // Fallback to raw value
       if (
         typeof field === "object" &&
         field.value != null
@@ -180,8 +162,7 @@ const Utils = {
         `Required sequence:\n` +
         `1. Actual\n` +
         `2. Comparison\n` +
-        `3. Budget\n\n` +
-        `Current Measures: ${measures ? measures.length : 0}`
+        `3. Budget`
       );
 
       return false;
@@ -213,13 +194,41 @@ const Utils = {
       queryResponse.fields.pivots &&
       queryResponse.fields.pivots.length > 0
     );
+  },
+
+  // =========================================
+  // ADAPTIVE SCALE
+  // =========================================
+
+  getDynamicMax(actual, budget) {
+
+    const max = Math.max(actual, budget, 1);
+
+    // Better handling for percentages/small numbers
+    if (max <= 5) {
+      return max * 1.05;
+    }
+
+    if (max <= 10) {
+      return max * 1.08;
+    }
+
+    if (max <= 100) {
+      return max * 1.10;
+    }
+
+    if (max <= 1000) {
+      return max * 1.15;
+    }
+
+    return max * 1.20;
   }
 };
 
 looker.plugins.visualizations.add({
 
-  id: "kpi_budget_v2",
-  label: "KPI vs Budget",
+  id: "kpi_budget_v3",
+  label: "KPI vs Budget v3",
 
   options: {
 
@@ -234,13 +243,21 @@ looker.plugins.visualizations.add({
     header_text: {
       type: "string",
       label: "Header Text",
-      default: "Net Fill Rate %"
+      default: "Actual vs Budget"
     },
 
     header_font_size: {
       type: "number",
       label: "Header Font Size",
       default: 18
+    },
+
+    // KPI
+
+    kpi_font_size: {
+      type: "number",
+      label: "KPI Font Size",
+      default: 48
     },
 
     // BUDGET SECTION
@@ -357,10 +374,6 @@ looker.plugins.visualizations.add({
         return done();
       }
 
-      // =====================================
-      // FIRST ROW
-      // =====================================
-
       const row = data[0];
 
       // =====================================
@@ -436,7 +449,12 @@ looker.plugins.visualizations.add({
       const isGood =
         actualValue >= budgetValue;
 
-      const color =
+      const barGradient =
+        isGood
+          ? "linear-gradient(90deg,#86efac 0%,#22c55e 100%)"
+          : "linear-gradient(90deg,#fca5a5 0%,#ef4444 100%)";
+
+      const textColor =
         isGood
           ? "#16a34a"
           : "#dc2626";
@@ -446,11 +464,10 @@ looker.plugins.visualizations.add({
       // =====================================
 
       const dynamicMax =
-        Math.max(
+        Utils.getDynamicMax(
           actualValue,
-          budgetValue,
-          1
-        ) * 1.15;
+          budgetValue
+        );
 
       const barWidth =
         (
@@ -463,6 +480,21 @@ looker.plugins.visualizations.add({
           budgetValue /
           dynamicMax
         ) * 100;
+
+      // =====================================
+      // AXIS DISPLAY
+      // =====================================
+
+      let axisMaxDisplay =
+        dynamicMax.toFixed(0);
+
+      if (
+        actualDisplay.toString().includes("%")
+      ) {
+
+        axisMaxDisplay =
+          dynamicMax.toFixed(1) + "%";
+      }
 
       // =====================================
       // DEBUG
@@ -500,7 +532,6 @@ looker.plugins.visualizations.add({
           }
 
           .main-value{
-            font-size:48px;
             font-weight:700;
             line-height:1.1;
           }
@@ -552,6 +583,7 @@ looker.plugins.visualizations.add({
             position:relative;
             background:#e5e7eb;
             border-radius:6px;
+            overflow:visible;
           }
 
           .bar{
@@ -599,9 +631,14 @@ looker.plugins.visualizations.add({
             : ""
           }
 
-          <!-- MAIN KPI -->
+          <!-- KPI -->
 
-          <div class="main-value">
+          <div
+            class="main-value"
+            style="
+              font-size:${config.kpi_font_size || 48}px;
+            "
+          >
             ${actualDisplay}
           </div>
 
@@ -636,7 +673,10 @@ looker.plugins.visualizations.add({
               : ""
             }
 
-            <span style="color:#6b7280;font-size:14px;">
+            <span style="
+              color:#6b7280;
+              font-size:14px;
+            ">
               vs prior period
             </span>
 
@@ -660,7 +700,7 @@ looker.plugins.visualizations.add({
                 </div>
 
                 <div style="color:#6b7280;">
-                  Budget: ${budgetDisplay}
+                  ${budgetDisplay}
                 </div>
 
               </div>
@@ -681,7 +721,7 @@ looker.plugins.visualizations.add({
               class="bar"
               style="
                 width:${Math.min(barWidth,100)}%;
-                background:${color};
+                background:${barGradient};
               "
             ></div>
 
@@ -702,7 +742,7 @@ looker.plugins.visualizations.add({
             ? `
               <div class="axis">
                 <span>0</span>
-                <span>${dynamicMax.toFixed(0)}</span>
+                <span>${axisMaxDisplay}</span>
               </div>
             `
             : ""
@@ -717,7 +757,7 @@ looker.plugins.visualizations.add({
               <div
                 class="budget-percent"
                 style="
-                  color:${color};
+                  color:${textColor};
                 "
               >
                 ${budgetPercent.toFixed(1)}% of budget
