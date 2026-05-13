@@ -227,7 +227,7 @@ const Utils = {
 
 looker.plugins.visualizations.add({
 
-  id: "kpi_vs_budget_v4",
+  id: "kpi_budget_v4",
   label: "KPI vs Budget v4",
 
   options: {
