@@ -1,4 +1,9 @@
+// =========================
+// Utility Helpers
+// =========================
+
 const Utils = {
+
   isValidNumber(value) {
     return (
       value !== null &&
@@ -47,6 +52,7 @@ const Utils = {
   },
 
   attachDrill(element, cell) {
+
     if (
       !cell ||
       !cell.links ||
@@ -58,21 +64,62 @@ const Utils = {
     element.style.cursor = "pointer";
 
     element.addEventListener("click", function (event) {
+
       event.stopPropagation();
 
       LookerCharts.Utils.openDrillMenu({
         links: cell.links,
         event: event
       });
+
     });
   }
 };
 
+// =========================
+// Visualization
+// =========================
+
 looker.plugins.visualizations.add({
-  id: "budget_vs_actual_bullet",
+
+  id: "budget_vs_actual_bullet_v2",
+
   label: "Budget vs Actual Bullet",
 
   options: {
+
+    // =========================
+    // HEADER OPTIONS
+    // =========================
+
+    show_title: {
+      type: "boolean",
+      label: "Show Header Title",
+      default: true
+    },
+
+    custom_title: {
+      type: "string",
+      label: "Header Title",
+      default: "Budget vs Actual"
+    },
+
+    title_font_size: {
+      type: "number",
+      label: "Title Font Size",
+      default: 24
+    },
+
+    title_color: {
+      type: "string",
+      label: "Title Color",
+      default: "#0f2d5c"
+    },
+
+    // =========================
+    // VALUE OPTIONS
+    // =========================
+
     show_values: {
       type: "boolean",
       label: "Show Values",
@@ -90,6 +137,10 @@ looker.plugins.visualizations.add({
       label: "Show Legend",
       default: true
     },
+
+    // =========================
+    // COLORS
+    // =========================
 
     green_color: {
       type: "string",
@@ -115,6 +166,10 @@ looker.plugins.visualizations.add({
       default: "#dde3ea"
     },
 
+    // =========================
+    // SIZING
+    // =========================
+
     bar_height: {
       type: "number",
       label: "Bar Height",
@@ -124,13 +179,20 @@ looker.plugins.visualizations.add({
     label_width: {
       type: "number",
       label: "Label Width",
-      default: 240
+      default: 320
     }
   },
 
+  // =========================
+  // CREATE
+  // =========================
+
   create: function (element) {
+
     element.innerHTML = `
+    
       <style>
+
         * {
           box-sizing: border-box;
         }
@@ -141,6 +203,13 @@ looker.plugins.visualizations.add({
           font-family: Inter, Arial, sans-serif;
         }
 
+        .bv-title {
+          font-weight: 700;
+          margin-bottom: 24px;
+          color: #0f2d5c;
+          line-height: 1.2;
+        }
+
         .bv-row {
           display: flex;
           align-items: center;
@@ -149,113 +218,174 @@ looker.plugins.visualizations.add({
         }
 
         .bv-label {
+
           font-size: 14px;
           font-weight: 600;
           color: #0f2d5c;
+
           padding-right: 14px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+
+          white-space: normal;
+          word-break: break-word;
+          line-height: 1.3;
+
+          display: flex;
+          align-items: center;
         }
 
         .bv-bar-container {
+
           position: relative;
           flex: 1;
+
           background: #dde3ea;
+
           border-radius: 6px;
+
           overflow: visible;
         }
 
         .bv-bar {
+
           position: absolute;
+
           top: 0;
           left: 0;
+
           border-radius: 6px;
+
           transition: width 0.3s ease;
         }
 
         .bv-marker {
+
           position: absolute;
+
           top: -6px;
+
           width: 3px;
+
           z-index: 5;
         }
 
         .bv-values {
+
           width: 220px;
           min-width: 220px;
+
           text-align: right;
+
           padding-left: 18px;
+
           white-space: nowrap;
+
           font-size: 14px;
         }
 
         .bv-actual {
+
           font-weight: 700;
+
           color: #0f2d5c;
         }
 
         .bv-budget {
+
           color: #6b7280;
+
           margin-left: 4px;
         }
 
         .bv-percent {
+
           margin-left: 10px;
+
           font-weight: 600;
         }
 
         .bv-legend {
+
           display: flex;
+
           flex-wrap: wrap;
+
           gap: 22px;
-          margin-top: 22px;
+
+          margin-top: 24px;
+
           padding-top: 16px;
+
           border-top: 1px solid #d1d5db;
+
           font-size: 12px;
+
           color: #4b5563;
         }
 
         .bv-legend-item {
+
           display: flex;
+
           align-items: center;
+
           gap: 6px;
         }
 
         .bv-legend-box {
+
           width: 14px;
           height: 14px;
+
           border-radius: 4px;
         }
 
         .bv-legend-line {
+
           width: 3px;
           height: 18px;
         }
 
         .bv-empty {
+
           padding: 24px;
+
           color: #6b7280;
+
           font-size: 14px;
         }
+
       </style>
 
       <div class="bv-wrapper"></div>
+
     `;
   },
 
+  // =========================
+  // UPDATE
+  // =========================
+
   updateAsync: function (
+
     data,
     element,
     config,
     queryResponse,
     details,
     done
+
   ) {
+
     try {
-      const wrapper = element.querySelector(".bv-wrapper");
+
+      const wrapper =
+        element.querySelector(".bv-wrapper");
 
       wrapper.innerHTML = "";
+
+      // =========================
+      // VALIDATION
+      // =========================
 
       if (
         !queryResponse ||
@@ -263,13 +393,14 @@ looker.plugins.visualizations.add({
         queryResponse.fields.dimension_like.length < 1 ||
         queryResponse.fields.measure_like.length < 2
       ) {
+
         wrapper.innerHTML = `
           <div class="bv-empty">
-            This visualization requires:
+            Requires:
             <br><br>
             • 1 Dimension
             <br>
-            • 2 Measures (Actual and Budget)
+            • 2 Measures
           </div>
         `;
 
@@ -278,6 +409,7 @@ looker.plugins.visualizations.add({
       }
 
       if (!data || !data.length) {
+
         wrapper.innerHTML = `
           <div class="bv-empty">
             No data available
@@ -288,92 +420,158 @@ looker.plugins.visualizations.add({
         return;
       }
 
-      const dimension = queryResponse.fields.dimension_like[0];
-      const actualMeasure = queryResponse.fields.measure_like[0];
-      const budgetMeasure = queryResponse.fields.measure_like[1];
+      // =========================
+      // HEADER
+      // =========================
+
+      if (config.show_title) {
+
+        const titleEl =
+          document.createElement("div");
+
+        titleEl.className = "bv-title";
+
+        titleEl.style.fontSize =
+          `${config.title_font_size || 24}px`;
+
+        titleEl.style.color =
+          config.title_color;
+
+        titleEl.innerText =
+          config.custom_title || "Budget vs Actual";
+
+        wrapper.appendChild(titleEl);
+      }
+
+      // =========================
+      // FIELDS
+      // =========================
+
+      const dimension =
+        queryResponse.fields.dimension_like[0];
+
+      const actualMeasure =
+        queryResponse.fields.measure_like[0];
+
+      const budgetMeasure =
+        queryResponse.fields.measure_like[1];
+
+      // =========================
+      // MAX SCALE
+      // =========================
 
       let maxValue = 0;
 
       data.forEach(row => {
-        const actual = Utils.toNumber(
-          row[actualMeasure.name]?.value
-        );
 
-        const budget = Utils.toNumber(
-          row[budgetMeasure.name]?.value
-        );
+        const actual =
+          Utils.toNumber(
+            row[actualMeasure.name]?.value
+          );
 
-        maxValue = Math.max(
-          maxValue,
-          actual,
-          budget
-        );
+        const budget =
+          Utils.toNumber(
+            row[budgetMeasure.name]?.value
+          );
+
+        maxValue =
+          Math.max(
+            maxValue,
+            actual,
+            budget
+          );
+
       });
 
       if (maxValue <= 0) {
         maxValue = 1;
       }
 
-      const barHeight = Math.max(
-        8,
-        Number(config.bar_height) || 16
-      );
+      // =========================
+      // CONFIG
+      // =========================
 
-      const labelWidth = Math.max(
-        120,
-        Number(config.label_width) || 240
-      );
+      const barHeight =
+        Math.max(
+          8,
+          Number(config.bar_height) || 16
+        );
+
+      const labelWidth =
+        Math.max(
+          120,
+          Number(config.label_width) || 320
+        );
+
+      // =========================
+      // ROWS
+      // =========================
 
       data.forEach(row => {
-        const actualCell = row[actualMeasure.name];
-        const budgetCell = row[budgetMeasure.name];
 
-        const label = Utils.safeText(
-          row[dimension.name]?.value
-        );
+        const actualCell =
+          row[actualMeasure.name];
 
-        const actual = Utils.toNumber(
-          actualCell?.value
-        );
+        const budgetCell =
+          row[budgetMeasure.name];
 
-        const budget = Utils.toNumber(
-          budgetCell?.value
-        );
+        const label =
+          Utils.safeText(
+            row[dimension.name]?.value
+          );
 
-        const actualFormatted = Utils.formatValue(
-          actualCell
-        );
+        const actual =
+          Utils.toNumber(
+            actualCell?.value
+          );
 
-        const budgetFormatted = Utils.formatValue(
-          budgetCell
-        );
+        const budget =
+          Utils.toNumber(
+            budgetCell?.value
+          );
 
-        const actualWidth = Math.min(
-          Utils.percent(actual, maxValue),
-          100
-        );
+        const actualFormatted =
+          Utils.formatValue(actualCell);
 
-        const budgetPosition = Math.min(
-          Utils.percent(budget, maxValue),
-          100
-        );
+        const budgetFormatted =
+          Utils.formatValue(budgetCell);
 
-        const isPositive = actual >= budget;
+        const actualWidth =
+          Math.min(
+            Utils.percent(actual, maxValue),
+            100
+          );
+
+        const budgetPosition =
+          Math.min(
+            Utils.percent(budget, maxValue),
+            100
+          );
+
+        const isPositive =
+          actual >= budget;
 
         const variancePercent =
           budget > 0
             ? Math.round((actual / budget) * 100)
             : 0;
 
-        const barColor = isPositive
-          ? config.green_color
-          : config.red_color;
+        const barColor =
+          isPositive
+            ? config.green_color
+            : config.red_color;
 
-        const rowEl = document.createElement("div");
+        // =========================
+        // ROW ELEMENT
+        // =========================
+
+        const rowEl =
+          document.createElement("div");
 
         rowEl.className = "bv-row";
 
         rowEl.innerHTML = `
+
           <div
             class="bv-label"
             style="
@@ -446,9 +644,14 @@ looker.plugins.visualizations.add({
             }
 
           </div>
+
         `;
 
         wrapper.appendChild(rowEl);
+
+        // =========================
+        // DRILL SUPPORT
+        // =========================
 
         const drillTarget =
           rowEl.querySelector(".bv-drillable");
@@ -457,40 +660,64 @@ looker.plugins.visualizations.add({
           drillTarget,
           actualCell
         );
+
       });
 
+      // =========================
+      // LEGEND
+      // =========================
+
       if (config.show_legend) {
-        const legend = document.createElement("div");
+
+        const legend =
+          document.createElement("div");
 
         legend.className = "bv-legend";
 
         legend.innerHTML = `
+
           <div class="bv-legend-item">
+
             <div
               class="bv-legend-box"
               style="background:${config.green_color}"
-            ></div>
+            >
+            </div>
 
-            <span>Actual ≥ Budget</span>
+            <span>
+              Actual ≥ Budget
+            </span>
+
           </div>
 
           <div class="bv-legend-item">
+
             <div
               class="bv-legend-box"
               style="background:${config.red_color}"
-            ></div>
+            >
+            </div>
 
-            <span>Actual &lt; Budget</span>
+            <span>
+              Actual &lt; Budget
+            </span>
+
           </div>
 
           <div class="bv-legend-item">
+
             <div
               class="bv-legend-line"
               style="background:${config.budget_marker_color}"
-            ></div>
+            >
+            </div>
 
-            <span>Budget</span>
+            <span>
+              Budget
+            </span>
+
           </div>
+
         `;
 
         wrapper.appendChild(legend);
