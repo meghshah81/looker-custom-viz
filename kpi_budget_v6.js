@@ -97,7 +97,6 @@ const Utils = {
 
       if (field == null) return "—";
 
-      // Preserve Looker formatting
       if (
         typeof field === "object" &&
         field.rendered != null
@@ -227,8 +226,8 @@ const Utils = {
 
 looker.plugins.visualizations.add({
 
-  id: "kpi_budget_v5",
-  label: "KPI vs Budget v5",
+  id: "kpi_budget_v6",
+  label: "KPI vs Budget v6",
 
   options: {
 
@@ -488,13 +487,11 @@ looker.plugins.visualizations.add({
       let labelTransform =
         "translateX(-50%)";
 
-      // Near right edge
       if (targetPosition >= 92) {
         labelTransform =
           "translateX(-100%)";
       }
 
-      // Near left edge
       if (targetPosition <= 8) {
         labelTransform =
           "translateX(0%)";
@@ -572,6 +569,7 @@ looker.plugins.visualizations.add({
             text-decoration:none;
             cursor:pointer;
             display:inline-block;
+            user-select:none;
           }
 
           .main-value-drill:hover{
@@ -697,13 +695,14 @@ looker.plugins.visualizations.add({
 
               ? `
 
-                <a
-                  href="#"
+                <span
                   id="kpi-drill-link"
                   class="main-value-drill"
+                  role="button"
+                  tabindex="0"
                 >
                   ${actualDisplay}
-                </a>
+                </span>
 
               `
 
@@ -783,8 +782,6 @@ looker.plugins.visualizations.add({
             "
           >
 
-            <!-- BAR -->
-
             <div
               class="bar"
               style="
@@ -792,8 +789,6 @@ looker.plugins.visualizations.add({
                 background:${barGradient};
               "
             ></div>
-
-            <!-- BUDGET LABEL -->
 
             <div
               class="budget-label"
@@ -805,8 +800,6 @@ looker.plugins.visualizations.add({
               ${budgetDisplay}
             </div>
 
-            <!-- TARGET LINE -->
-
             <div
               class="target-line"
               style="
@@ -816,8 +809,6 @@ looker.plugins.visualizations.add({
             ></div>
 
           </div>
-
-          <!-- AXIS -->
 
           ${
             config.show_axis
@@ -829,8 +820,6 @@ looker.plugins.visualizations.add({
             `
             : ""
           }
-
-          <!-- % OF BUDGET -->
 
           ${
             config.show_budget_percent &&
@@ -861,19 +850,38 @@ looker.plugins.visualizations.add({
       if (
         drillLink &&
         actualField &&
-        actualField.links
+        actualField.links &&
+        actualField.links.length
       ) {
 
-        drillLink.addEventListener(
-          "click",
+        const openDrill =
           function(event) {
 
             event.preventDefault();
+            event.stopPropagation();
 
             LookerCharts.Utils.openDrillMenu({
               links: actualField.links,
               event: event
             });
+          };
+
+        drillLink.addEventListener(
+          "click",
+          openDrill
+        );
+
+        drillLink.addEventListener(
+          "keydown",
+          function(event) {
+
+            if (
+              event.key === "Enter" ||
+              event.key === " "
+            ) {
+
+              openDrill(event);
+            }
           }
         );
       }
