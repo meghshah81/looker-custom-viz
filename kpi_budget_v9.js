@@ -235,8 +235,8 @@ const Utils = {
 
 looker.plugins.visualizations.add({
 
-  id: "kpi_budget_v8",
-  label: "KPI vs Budget v8",
+  id: "kpi_budget_v9",
+  label: "KPI vs Budget v9",
 
   options: {
 
@@ -528,7 +528,10 @@ looker.plugins.visualizations.add({
 
       const dynamicMax =
         useFourthAsMax
-          ? fourthValue
+          ? Utils.getDynamicMax(
+              Math.max(actualValue, fourthValue),
+              budgetValue
+            )
           : Utils.getDynamicMax(
               actualValue,
               budgetValue
@@ -547,13 +550,16 @@ looker.plugins.visualizations.add({
         ) * 100;
 
       // =====================================
-      // BAR TRACK COLOR
+      // 4TH MEASURE BAR WIDTH
       // =====================================
 
-      const barTrackColor =
+      const fourthBarWidth =
         useFourthAsMax
-          ? "#bcc5d0"
-          : "#e5e7eb";
+          ? (
+              fourthValue /
+              dynamicMax
+            ) * 100
+          : 0;
 
       // =====================================
       // SMART LABEL ALIGNMENT
@@ -714,9 +720,20 @@ looker.plugins.visualizations.add({
             overflow:visible;
           }
 
+          .fourth-bar{
+            position:absolute;
+            top:0;
+            left:0;
+            height:100%;
+            background:#b0b8c4;
+            border-radius:10px;
+          }
+
           .bar{
             height:100%;
             border-radius:10px;
+            position:relative;
+            z-index:1;
           }
 
           .target-line{
@@ -725,6 +742,7 @@ looker.plugins.visualizations.add({
             width:3px;
             background:#111827;
             border-radius:2px;
+            z-index:2;
           }
 
           .budget-label{
@@ -734,6 +752,7 @@ looker.plugins.visualizations.add({
             font-weight:600;
             color:#6b7280;
             white-space:nowrap;
+            z-index:3;
           }
 
           .axis{
@@ -883,9 +902,22 @@ looker.plugins.visualizations.add({
             class="bar-wrap"
             style="
               height:${config.bar_height || 12}px;
-              background:${barTrackColor};
+              background:#e5e7eb;
             "
           >
+
+            ${
+              useFourthAsMax
+              ? `
+                <div
+                  class="fourth-bar"
+                  style="
+                    width:${Math.min(fourthBarWidth,100)}%;
+                  "
+                ></div>
+              `
+              : ""
+            }
 
             <div
               class="bar"
