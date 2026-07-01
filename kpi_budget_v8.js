@@ -97,7 +97,6 @@ const Utils = {
 
       if (field == null) return "—";
 
-      // Preserve Looker formatting
       if (
         typeof field === "object" &&
         field.rendered != null
@@ -152,19 +151,27 @@ const Utils = {
   validateMeasureCount(
     element,
     measures,
-    required
+    required,
+    showFourth
   ) {
 
     if (!measures || measures.length < required) {
 
+      const lines = [
+        "1. Actual",
+        "2. Comparison",
+        "3. Budget"
+      ];
+
+      if (showFourth) {
+        lines.push("4. Total Capacity");
+      }
+
       this.showError(
         element,
-        `This visualization requires at least ${required} measures.\n\n` +
+        `This visualization requires exactly ${required} measures.\n\n` +
         `Required sequence:\n` +
-        `1. Actual\n` +
-        `2. Comparison\n` +
-        `3. Budget` +
-        (required === 4 ? `\n4. Total Slots` : "")
+        lines.join("\n")
       );
 
       return false;
@@ -228,8 +235,8 @@ const Utils = {
 
 looker.plugins.visualizations.add({
 
-  id: "kpi_budget_v7",
-  label: "KPI vs Budget v7",
+  id: "kpi_budget_v8",
+  label: "KPI vs Budget v8",
 
   options: {
 
@@ -275,20 +282,6 @@ looker.plugins.visualizations.add({
       default: "Actual vs Budget"
     },
 
-    // 4TH MEASURE CONFIGURATIONS
-
-    show_fourth_measure: {
-      type: "boolean",
-      label: "Show 4th Measure (Total Slots Track)",
-      default: false
-    },
-
-    fourth_measure_label: {
-      type: "string",
-      label: "4th Measure Label Text",
-      default: "Total Slots"
-    },
-
     // BAR
 
     bar_height: {
@@ -311,6 +304,26 @@ looker.plugins.visualizations.add({
       type: "boolean",
       label: "Show % of Budget",
       default: true
+    },
+
+    // 4TH MEASURE
+
+    show_fourth_measure: {
+      type: "boolean",
+      label: "Show 4th Measure",
+      default: false
+    },
+
+    fourth_measure_label: {
+      type: "string",
+      label: "4th Measure Label",
+      default: "Total Slots"
+    },
+
+    fourth_measure_font_size: {
+      type: "number",
+      label: "4th Measure Font Size",
+      default: 14
     },
 
     // DEBUG
@@ -365,15 +378,19 @@ looker.plugins.visualizations.add({
 
       const measures =
         Utils.getMeasures(queryResponse);
-        
-      const useFourth = config.show_fourth_measure && measures.length >= 4;
-      const requiredCount = useFourth ? 4 : 3;
+
+      const showFourth =
+        config.show_fourth_measure;
+
+      const requiredCount =
+        showFourth ? 4 : 3;
 
       if (
         !Utils.validateMeasureCount(
           root,
           measures,
-          requiredCount
+          requiredCount,
+          showFourth
         )
       ) {
         return done();
@@ -415,10 +432,31 @@ looker.plugins.visualizations.add({
           row,
           measures[2].name
         );
-        
-      const fourthValue = useFourth
-        ? Utils.getNumericValue(row, measures[3].name)
-        : 0;
+
+      // =====================================
+      // 4TH MEASURE VALUES
+      // =====================================
+
+      let fourthValue = 0;
+      let fourthDisplay = "—";
+
+      if (
+        showFourth &&
+        measures.length >= 4
+      ) {
+
+        fourthValue =
+          Utils.getNumericValue(
+            row,
+            measures[3].name
+          );
+
+        fourthDisplay =
+          Utils.getDisplayValue(
+            row,
+            measures[3].name
+          );
+      }
 
       // =====================================
       // DISPLAY VALUES
@@ -441,10 +479,6 @@ looker.plugins.visualizations.add({
           row,
           measures[2].name
         );
-        
-      const fourthDisplay = useFourth
-        ? Utils.getDisplayValue(row, measures[3].name)
-        : "";
 
       // =====================================
       // CALCULATIONS
@@ -486,12 +520,19 @@ looker.plugins.visualizations.add({
           : "#dc2626";
 
       // =====================================
-      // DYNAMIC SCALE (ADAPTED FOR 4TH MEASURE)
+      // DYNAMIC SCALE
       // =====================================
 
-      const dynamicMax = useFourth
-        ? Math.max(actualValue, budgetValue, fourthValue, 1)
-        : Utils.getDynamicMax(actualValue, budgetValue);
+      const useFourthAsMax =
+        showFourth && fourthValue > 0;
+
+      const dynamicMax =
+        useFourthAsMax
+          ? fourthValue
+          : Utils.getDynamicMax(
+              actualValue,
+              budgetValue
+            );
 
       const barWidth =
         (
@@ -506,19 +547,26 @@ looker.plugins.visualizations.add({
         ) * 100;
 
       // =====================================
+      // BAR TRACK COLOR
+      // =====================================
+
+      const barTrackColor =
+        useFourthAsMax
+          ? "#bcc5d0"
+          : "#e5e7eb";
+
+      // =====================================
       // SMART LABEL ALIGNMENT
       // =====================================
 
       let labelTransform =
         "translateX(-50%)";
 
-      // Near right edge
       if (targetPosition >= 92) {
         labelTransform =
           "translateX(-100%)";
       }
 
-      // Near left edge
       if (targetPosition <= 8) {
         labelTransform =
           "translateX(0%)";
@@ -540,6 +588,28 @@ looker.plugins.visualizations.add({
       }
 
       // =====================================
+      // DRILL SUPPORT
+      // =====================================
+
+      const actualField =
+        row[measures[0].name];
+
+      const hasDrill =
+        actualField &&
+        actualField.links &&
+        actualField.links.length > 0;
+
+      // =====================================
+      // 4TH MEASURE LABEL CONFIG
+      // =====================================
+
+      const fourthLabel =
+        config.fourth_measure_label || "Total Slots";
+
+      const fourthFontSize =
+        config.fourth_measure_font_size || 14;
+
+      // =====================================
       // DEBUG
       // =====================================
 
@@ -553,6 +623,8 @@ looker.plugins.visualizations.add({
           comparisonValue,
           budgetValue,
           fourthValue,
+          showFourth,
+          useFourthAsMax,
           dynamicMax
         });
       }
@@ -579,6 +651,18 @@ looker.plugins.visualizations.add({
           .main-value{
             font-weight:700;
             line-height:1.1;
+          }
+
+          .main-value-drill{
+            color:inherit;
+            text-decoration:none;
+            cursor:pointer;
+            display:inline-block;
+            user-select:none;
+          }
+
+          .main-value-drill:hover{
+            opacity:0.85;
           }
 
           .comparison-row{
@@ -626,7 +710,6 @@ looker.plugins.visualizations.add({
 
           .bar-wrap{
             position:relative;
-            background:#e5e7eb;
             border-radius:10px;
             overflow:visible;
           }
@@ -662,9 +745,25 @@ looker.plugins.visualizations.add({
           }
 
           .budget-percent{
-            margin-top:10px;
             font-size:14px;
             font-weight:600;
+          }
+
+          .bottom-row{
+            margin-top:10px;
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+          }
+
+          .fourth-measure-label{
+            font-weight:500;
+            color:#4b5563;
+          }
+
+          .fourth-measure-value{
+            font-weight:700;
+            color:#1f2937;
           }
 
         </style>
@@ -686,16 +785,37 @@ looker.plugins.visualizations.add({
             : ""
           }
 
+          <!-- KPI -->
+
           <div
-            id="kpi-native-drill-target"
             class="main-value"
             style="
               font-size:${config.kpi_font_size || 48}px;
-              cursor: pointer;
             "
           >
-            ${actualDisplay}
+
+            ${
+              hasDrill
+
+              ? `
+
+                <span
+                  id="kpi-drill-link"
+                  class="main-value-drill"
+                  role="button"
+                  tabindex="0"
+                >
+                  ${actualDisplay}
+                </span>
+
+              `
+
+              : actualDisplay
+            }
+
           </div>
+
+          <!-- COMPARISON -->
 
           <div class="comparison-row">
 
@@ -735,6 +855,8 @@ looker.plugins.visualizations.add({
 
           </div>
 
+          <!-- PRIOR -->
+
           <div class="prior">
             Prior: ${comparisonDisplay}
           </div>
@@ -755,54 +877,29 @@ looker.plugins.visualizations.add({
             : ""
           }
 
+          <!-- BAR -->
+
           <div
             class="bar-wrap"
             style="
               height:${config.bar_height || 12}px;
-              background:${useFourth ? '#f3f4f6' : '#e5e7eb'};
+              background:${barTrackColor};
             "
           >
-
-            ${
-              useFourth
-              ? `
-                <div 
-                  style="
-                    position: absolute; 
-                    left: 0; 
-                    top: 0; 
-                    bottom: 0; 
-                    width: ${Math.min(targetPosition, 100)}%; 
-                    background: #cbd5e1; 
-                    border: 1px solid #94a3b8; 
-                    border-radius: 6px; 
-                    box-sizing: border-box; 
-                    z-index: 1;
-                  "
-                ></div>
-              `
-              : ""
-            }
 
             <div
               class="bar"
               style="
-                position: absolute;
-                left: 0;
-                top: 0;
-                bottom: 0;
                 width:${Math.min(barWidth,100)}%;
                 background:${barGradient};
-                z-index: 2;
               "
             ></div>
 
             <div
               class="budget-label"
               style="
-                left:${targetPosition}%;
+                left:${Math.min(targetPosition,100)}%;
                 transform:${labelTransform};
-                z-index: 4;
               "
             >
               ${budgetDisplay}
@@ -811,9 +908,8 @@ looker.plugins.visualizations.add({
             <div
               class="target-line"
               style="
-                left:${targetPosition}%;
+                left:${Math.min(targetPosition,100)}%;
                 height:${(config.bar_height || 12) + 12}px;
-                z-index: 3;
               "
             ></div>
 
@@ -830,59 +926,102 @@ looker.plugins.visualizations.add({
             : ""
           }
 
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-            ${
-              config.show_budget_percent && budgetPercent !== null
-              ? `
-                <div
-                  class="budget-percent"
-                  style="
-                    color:${textColor};
-                    margin-top: 0;
-                  "
-                >
-                  ${budgetPercent.toFixed(1)}% of budget
-                </div>
-              `
-              : "<div></div>"
-            }
-            
-            ${
-              useFourth
-              ? `
-                <div
-                  style="
-                    font-size: 14px;
-                    font-weight: 600;
-                    color: #1f2937;
-                    margin-top: 10px;
-                  "
-                >
-                  ${config.fourth_measure_label}: ${fourthDisplay}
-                </div>
-              `
-              : ""
-            }
-          </div>
+          <!-- BOTTOM ROW: Budget % & 4th Measure -->
+
+          ${
+            (
+              (config.show_budget_percent && budgetPercent !== null) ||
+              (showFourth && fourthValue > 0)
+            )
+            ? `
+              <div class="bottom-row">
+
+                ${
+                  config.show_budget_percent &&
+                  budgetPercent !== null
+                  ? `
+                    <div
+                      class="budget-percent"
+                      style="
+                        color:${textColor};
+                      "
+                    >
+                      ${budgetPercent.toFixed(1)}% of budget
+                    </div>
+                  `
+                  : `<div></div>`
+                }
+
+                ${
+                  showFourth && fourthValue > 0
+                  ? `
+                    <div
+                      class="fourth-measure-label"
+                      style="
+                        font-size:${fourthFontSize}px;
+                      "
+                    >
+                      ${fourthLabel}:
+                      <span class="fourth-measure-value">
+                        ${fourthDisplay}
+                      </span>
+                    </div>
+                  `
+                  : ""
+                }
+
+              </div>
+            `
+            : ""
+          }
 
         </div>
       `;
 
       // =====================================
-      // LOOKER NATIVE DRILL DOWN BINDING
+      // DRILL MENU
       // =====================================
-      const kpiElement = root.querySelector("#kpi-native-drill-target");
-      if (kpiElement) {
-        kpiElement.addEventListener("click", function(event) {
-          const targetCell = row[measures[0].name];
-          
-          if (targetCell && targetCell.links && targetCell.links.length > 0) {
+
+      const drillLink =
+        root.querySelector("#kpi-drill-link");
+
+      if (
+        drillLink &&
+        actualField &&
+        actualField.links &&
+        actualField.links.length
+      ) {
+
+        const openDrill =
+          function(event) {
+
+            event.preventDefault();
+            event.stopPropagation();
+
             LookerCharts.Utils.openDrillMenu({
-              links: targetCell.links,
+              links: actualField.links,
               event: event
             });
+          };
+
+        drillLink.addEventListener(
+          "click",
+          openDrill
+        );
+
+        drillLink.addEventListener(
+          "keydown",
+          function(event) {
+
+            if (
+              event.key === "Enter" ||
+              event.key === " "
+            ) {
+
+              openDrill(event);
+            }
           }
-        });
+        );
       }
 
     } catch(e) {
