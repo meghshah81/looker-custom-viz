@@ -235,8 +235,8 @@ const Utils = {
 
 looker.plugins.visualizations.add({
 
-  id: "kpi_budget_v9",
-  label: "KPI vs Budget v9",
+  id: "kpi_budget_v10",
+  label: "KPI vs Budget v10",
 
   options: {
 
@@ -538,10 +538,15 @@ looker.plugins.visualizations.add({
             );
 
       const barWidth =
-        (
-          actualValue /
-          dynamicMax
-        ) * 100;
+        useFourthAsMax
+          ? (
+              Math.min(actualValue, fourthValue) /
+              dynamicMax
+            ) * 100
+          : (
+              actualValue /
+              dynamicMax
+            ) * 100;
 
       const targetPosition =
         (
@@ -556,7 +561,7 @@ looker.plugins.visualizations.add({
       const fourthBarWidth =
         useFourthAsMax
           ? (
-              fourthValue /
+              Math.max(actualValue, fourthValue) /
               dynamicMax
             ) * 100
           : 0;
