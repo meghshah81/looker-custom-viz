@@ -164,8 +164,8 @@ const Utils = {
 
 looker.plugins.visualizations.add({
 
-  id: "kpi_budget_v11",
-  label: "KPI vs Budget v11",
+  id: "kpi_budget_v12",
+  label: "KPI vs Budget v12",
 
   options: {
     // HEADER
@@ -201,11 +201,17 @@ looker.plugins.visualizations.add({
       label: "Actual vs Budget Text",
       default: "Actual vs Budget"
     },
-    // NEW: 4TH MEASURE TOGGLE
+    // 4TH MEASURE TOGGLE
     show_fourth_measure: {
       type: "boolean",
       label: "Enable 4th Measure Line",
       default: false
+    },
+    // NEW: 4TH MEASURE CUSTOMIZABLE LABEL
+    fourth_measure_label_text: {
+      type: "string",
+      label: "4th Measure Custom Label",
+      default: "Slots"
     },
     // BAR
     bar_height: {
@@ -374,14 +380,12 @@ looker.plugins.visualizations.add({
             border-top: 1px solid #e5e7eb;
             margin: 20px 0;
           }
-          /* CHANGED: Swapped flex layout to block to isolate the header on its own line */
           .budget-row {
             display: block;
             margin-bottom: 12px;
             font-size: 14px;
             font-weight: 600;
           }
-          /* CHANGED: Increased vertical margins to safely contain labels without overlaps */
           .bar-wrap {
             position: relative;
             background: #e5e7eb;
@@ -410,7 +414,6 @@ looker.plugins.visualizations.add({
             color: #6b7280;
             white-space: nowrap;
           }
-          /* NEW: Symmetrical 4th Measure indicator styles matching budget lines */
           .fourth-line {
             position: absolute;
             top: -6px;
@@ -467,25 +470,4 @@ looker.plugins.visualizations.add({
 
             <div class="target-line" style="left:${targetPosition}%; height:${(config.bar_height || 12) + 12}px;"></div>
 
-            ${config.show_fourth_measure ? `
-              <div class="fourth-label" style="left:${fourthPosition}%; transform:${fourthLabelTransform};">${fourthDisplay}</div>
-              
-              <div class="fourth-line" style="left:${fourthPosition}%; height:${(config.bar_height || 12) + 12}px;"></div>
-            ` : ""}
-          </div>
-
-          ${config.show_axis ? `<div class="axis"><span>0</span><span>${axisMaxDisplay}</span></div>` : ""}
-
-          ${config.show_budget_percent && budgetPercent !== null ? `
-            <div class="budget-percent" style="color:${textColor};">${budgetPercent.toFixed(1)}% of budget</div>
-          ` : ""}
-        </div>
-      `;
-
-    } catch(e) {
-      console.error(e);
-      Utils.showError(root, "Unexpected Visualization Error\n\n" + e.message);
-    }
-    done();
-  }
-});
+            ${config.show_fourth_
