@@ -70,9 +70,9 @@ attachDrill(element, cell) {
 
 looker.plugins.visualizations.add({
 
-id: "budget_vs_actual_bullet_v8",
+id: "budget_vs_actual_bullet_v9",
 
-label: "Budget vs Actual Bullet v8",
+label: "Budget vs Actual Bullet v9",
 
 options: {
 
@@ -162,13 +162,6 @@ options: {
       type: "number",
       label: "Bar Height",
       default: 16
-    },
-
-    // OPTIMIZED: Changed default left label width from 320 to 120
-    label_width: {
-      type: "number",
-      label: "Label Width",
-      default: 120
     }
 
 },
@@ -209,10 +202,9 @@ create: function (element) {
           font-size: 14px;
           font-weight: 600;
           color: #0f2d5c;
-          padding-right: 6px;
-          white-space: normal;
-          word-break: break-word;
-          line-height: 1.3;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
           display: flex;
           align-items: center;
         }
@@ -220,7 +212,6 @@ create: function (element) {
         .bv-bar-container {
           position: relative;
           flex: 1;
-          margin-left: -8px;
           background: #dde3ea;
           border-radius: 6px;
           overflow: visible;
@@ -241,12 +232,8 @@ create: function (element) {
           z-index: 5;
         }
 
-        /* OPTIMIZED: Narrowed width to 150px and closed the gap padding */
         .bv-values {
-          width: 150px;
-          min-width: 150px;
           text-align: right;
-          padding-left: 8px;
           white-space: nowrap;
           font-size: 14px;
         }
@@ -433,7 +420,7 @@ updateAsync: function (
       }
 
       // =========================
-      // CONFIG
+      // CONFIG & LAYOUT ENGINE (PERFECT SYMMETRY)
       // =========================
 
       const barHeight =
@@ -442,12 +429,9 @@ updateAsync: function (
           Number(config.bar_height) || 16
         );
 
-      // OPTIMIZED: Lowered thresholds to respect the tightened 120px layout
-      const labelWidth =
-        Math.max(
-          60,
-          Number(config.label_width) || 120
-        );
+      const labelWidth = 85;   // Perfect fit for entity text footprint
+      const valuesWidth = 135; // Perfect fit for standard numeric strings
+      const gapSize = 8;       // UPDATED: Tightened margin separation on both sides
 
       // =========================
       // ROWS
@@ -535,6 +519,8 @@ updateAsync: function (
             style="
               height:${barHeight}px;
               background:${config.track_color};
+              margin-left:${gapSize}px;
+              margin-right:${gapSize}px;
             "
           >
 
@@ -560,7 +546,14 @@ updateAsync: function (
 
           </div>
 
-          <div class="bv-values bv-drillable">
+          <div 
+            class="bv-values bv-drillable"
+            style="
+              width:${valuesWidth}px;
+              min-width:${valuesWidth}px;
+              max-width:${valuesWidth}px;
+            "
+          >
 
             ${
               config.show_values
@@ -654,41 +647,4 @@ updateAsync: function (
 
             <div
               class="bv-legend-line"
-              style="background:${config.budget_marker_color}"
-            >
-            </div>
-
-            <span>
-              Budget
-            </span>
-
-          </div>
-
-        `;
-
-        wrapper.appendChild(legend);
-      }
-
-      done();
-
-    } catch (err) {
-
-      console.error(
-        "Budget vs Actual Bullet Error:",
-        err
-      );
-
-      element.innerHTML = `
-        <div style="
-          padding:20px;
-          color:#dc2626;
-          font-family:Arial;
-        ">
-          Error rendering visualization
-        </div>
-      `;
-
-      done();
-    }
-
-} });
+              style="background:${config.budget
