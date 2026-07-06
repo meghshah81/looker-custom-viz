@@ -1,5 +1,6 @@
-// ========================= // Utility Helpers //
-=========================
+// ========================= 
+// Utility Helpers 
+// =========================
 
 const Utils = {
 
@@ -64,14 +65,15 @@ attachDrill(element, cell) {
 
 } };
 
-// ========================= // Visualization //
-=========================
+// ========================= 
+// Visualization 
+// =========================
 
 looker.plugins.visualizations.add({
 
-id: “budget_vs_actual_bullet_v4”,
+id: “budget_vs_actual_bullet_v5”,
 
-label: “Budget vs Actual Bullet v4”,
+label: “Budget vs Actual Bullet v5”,
 
 options: {
 
