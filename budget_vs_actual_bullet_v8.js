@@ -70,9 +70,9 @@ attachDrill(element, cell) {
 
 looker.plugins.visualizations.add({
 
-id: "budget_vs_actual_bullet_v7",
+id: "budget_vs_actual_bullet_v8",
 
-label: "Budget vs Actual Bullet v7",
+label: "Budget vs Actual Bullet v8",
 
 options: {
 
@@ -164,10 +164,11 @@ options: {
       default: 16
     },
 
+    // OPTIMIZED: Changed default left label width from 320 to 120
     label_width: {
       type: "number",
       label: "Label Width",
-      default: 120 // Decreased default from 320 to 120 to bring bars closer
+      default: 120
     }
 
 },
@@ -205,140 +206,97 @@ create: function (element) {
         }
 
         .bv-label {
-
           font-size: 14px;
           font-weight: 600;
           color: #0f2d5c;
-
           padding-right: 6px;
-
           white-space: normal;
           word-break: break-word;
           line-height: 1.3;
-
           display: flex;
           align-items: center;
         }
 
         .bv-bar-container {
-
           position: relative;
           flex: 1;
           margin-left: -8px;
-
           background: #dde3ea;
-
           border-radius: 6px;
-
           overflow: visible;
         }
 
         .bv-bar {
-
           position: absolute;
-
           top: 0;
           left: 0;
-
           border-radius: 6px;
-
           transition: width 0.3s ease;
         }
 
         .bv-marker {
-
           position: absolute;
-
           top: -6px;
-
           width: 3px;
-
           z-index: 5;
         }
 
+        /* OPTIMIZED: Narrowed width to 150px and closed the gap padding */
         .bv-values {
-
-          width: 220px;
-          min-width: 220px;
-
+          width: 150px;
+          min-width: 150px;
           text-align: right;
-
-          padding-left: 18px;
-
+          padding-left: 8px;
           white-space: nowrap;
-
           font-size: 14px;
         }
 
         .bv-actual {
-
           font-weight: 700;
-
           color: #0f2d5c;
         }
 
         .bv-budget {
-
           color: #6b7280;
-
           margin-left: 4px;
         }
 
         .bv-percent {
-
           margin-left: 10px;
-
           font-weight: 600;
         }
 
         .bv-legend {
-
           display: flex;
-
           flex-wrap: wrap;
-
           gap: 22px;
-
           margin-top: 24px;
-
           padding-top: 16px;
-
           border-top: 1px solid #d1d5db;
-
           font-size: 12px;
-
           color: #4b5563;
         }
 
         .bv-legend-item {
-
           display: flex;
-
           align-items: center;
-
           gap: 6px;
         }
 
         .bv-legend-box {
-
           width: 14px;
           height: 14px;
-
           border-radius: 4px;
         }
 
         .bv-legend-line {
-
           width: 3px;
           height: 18px;
         }
 
         .bv-empty {
-
           padding: 24px;
-
           color: #6b7280;
-
           font-size: 14px;
         }
 
@@ -484,10 +442,11 @@ updateAsync: function (
           Number(config.bar_height) || 16
         );
 
+      // OPTIMIZED: Lowered thresholds to respect the tightened 120px layout
       const labelWidth =
         Math.max(
-          40, // Lowered minimum allowed width down to 40px
-          Number(config.label_width) || 120 // Lowered fallback from 320 to 120
+          60,
+          Number(config.label_width) || 120
         );
 
       // =========================
@@ -672,7 +631,7 @@ updateAsync: function (
             </div>
 
             <span>
-              Actual ≥ Budget
+              Actual &ge; Budget
             </span>
 
           </div>
