@@ -164,8 +164,8 @@ const Utils = {
 
 looker.plugins.visualizations.add({
 
-  id: "kpi_budget_v9",
-  label: "KPI vs Budget v9",
+  id: "kpi_budget_v11",
+  label: "KPI vs Budget v11",
 
   options: {
     // HEADER
@@ -307,4 +307,185 @@ looker.plugins.visualizations.add({
       const targetPosition = (budgetValue / dynamicMax) * 100;
       const fourthPosition = config.show_fourth_measure ? (fourthValue / dynamicMax) * 100 : 0;
 
-      // =================================
+      // =====================================
+      // SMART LABEL ALIGNMENT (BUDGET)
+      // =====================================
+      let labelTransform = "translateX(-50%)";
+      if (targetPosition >= 92) labelTransform = "translateX(-100%)";
+      if (targetPosition <= 8) labelTransform = "translateX(0%)";
+
+      // =====================================
+      // SMART LABEL ALIGNMENT (4TH MEASURE)
+      // =====================================
+      let fourthLabelTransform = "translateX(-50%)";
+      if (fourthPosition >= 92) fourthLabelTransform = "translateX(-100%)";
+      if (fourthPosition <= 8) fourthLabelTransform = "translateX(0%)";
+
+      // =====================================
+      // AXIS GENERATION
+      // =====================================
+      let axisMaxDisplay = dynamicMax.toFixed(0);
+      if (actualDisplay.toString().includes("%")) {
+        axisMaxDisplay = dynamicMax.toFixed(1) + "%";
+      }
+
+      if (config.debug_mode) {
+        console.log({ queryResponse, data, measures, actualValue, comparisonValue, budgetValue, fourthValue });
+      }
+
+      // =====================================
+      // RENDER CANVAS
+      // =====================================
+      root.innerHTML = `
+        <style>
+          .viz-wrap {
+            font-family: Inter, Arial, sans-serif;
+            padding: 16px;
+            color: #111827;
+          }
+          .header {
+            font-weight: 600;
+            margin-bottom: 20px;
+          }
+          .main-value {
+            font-weight: 700;
+            line-height: 1.1;
+          }
+          .comparison-row {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+          .badge {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+          }
+          .green { background: #dcfce7; color: #16a34a; }
+          .red { background: #fee2e2; color: #dc2626; }
+          .prior {
+            margin-top: 8px;
+            color: #6b7280;
+            font-size: 14px;
+          }
+          .divider {
+            border-top: 1px solid #e5e7eb;
+            margin: 20px 0;
+          }
+          /* CHANGED: Swapped flex layout to block to isolate the header on its own line */
+          .budget-row {
+            display: block;
+            margin-bottom: 12px;
+            font-size: 14px;
+            font-weight: 600;
+          }
+          /* CHANGED: Increased vertical margins to safely contain labels without overlaps */
+          .bar-wrap {
+            position: relative;
+            background: #e5e7eb;
+            border-radius: 10px;
+            overflow: visible;
+            margin-top: 36px;
+            margin-bottom: 36px;
+          }
+          .bar {
+            height: 100%;
+            border-radius: 10px;
+          }
+          .target-line {
+            position: absolute;
+            top: -6px;
+            width: 3px;
+            background: #111827;
+            border-radius: 2px;
+            z-index: 6;
+          }
+          .budget-label {
+            position: absolute;
+            top: -32px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7280;
+            white-space: nowrap;
+          }
+          /* NEW: Symmetrical 4th Measure indicator styles matching budget lines */
+          .fourth-line {
+            position: absolute;
+            top: -6px;
+            width: 0px;
+            border-left: 3px dotted #111827;
+            z-index: 5;
+          }
+          .fourth-label {
+            position: absolute;
+            bottom: -32px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7280;
+            white-space: nowrap;
+          }
+          .axis {
+            margin-top: 8px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #6b7280;
+          }
+          .budget-percent {
+            margin-top: 10px;
+            font-size: 14px;
+            font-weight: 600;
+          }
+        </style>
+
+        <div class="viz-wrap">
+          ${config.show_header ? `<div class="header" style="font-size:${config.header_font_size || 18}px;">${config.header_text}</div>` : ""}
+
+          <div class="main-value" style="font-size:${config.kpi_font_size || 48}px;">${actualDisplay}</div>
+
+          <div class="comparison-row">
+            ${variancePercent !== null ? `
+              <span class="badge ${variancePercent >= 0 ? "green" : "red"}">
+                ${variancePercent >= 0 ? "▲" : "▼"} ${Math.abs(variancePercent).toFixed(1)}%
+              </span>
+            ` : ""}
+            <span style="color:#6b7280; font-size:14px;">vs prior period</span>
+          </div>
+
+          <div class="prior">Prior: ${comparisonDisplay}</div>
+          <div class="divider"></div>
+
+          ${config.show_budget_section ? `<div class="budget-row"><div>${config.budget_section_text}</div></div>` : ""}
+
+          <div class="bar-wrap" style="height:${config.bar_height || 12}px;">
+            
+            <div class="bar" style="width:${Math.min(barWidth, 100)}%; background:${barGradient};"></div>
+
+            <div class="budget-label" style="left:${targetPosition}%; transform:${labelTransform};">${budgetDisplay}</div>
+
+            <div class="target-line" style="left:${targetPosition}%; height:${(config.bar_height || 12) + 12}px;"></div>
+
+            ${config.show_fourth_measure ? `
+              <div class="fourth-label" style="left:${fourthPosition}%; transform:${fourthLabelTransform};">${fourthDisplay}</div>
+              
+              <div class="fourth-line" style="left:${fourthPosition}%; height:${(config.bar_height || 12) + 12}px;"></div>
+            ` : ""}
+          </div>
+
+          ${config.show_axis ? `<div class="axis"><span>0</span><span>${axisMaxDisplay}</span></div>` : ""}
+
+          ${config.show_budget_percent && budgetPercent !== null ? `
+            <div class="budget-percent" style="color:${textColor};">${budgetPercent.toFixed(1)}% of budget</div>
+          ` : ""}
+        </div>
+      `;
+
+    } catch(e) {
+      console.error(e);
+      Utils.showError(root, "Unexpected Visualization Error\n\n" + e.message);
+    }
+    done();
+  }
+});
