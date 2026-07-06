@@ -167,7 +167,7 @@ options: {
     label_width: {
       type: "number",
       label: "Label Width",
-      default: 320
+      default: 120 // Decreased default from 320 to 120 to bring bars closer
     }
 
 },
@@ -486,8 +486,8 @@ updateAsync: function (
 
       const labelWidth =
         Math.max(
-          120,
-          Number(config.label_width) || 320
+          40, // Lowered minimum allowed width down to 40px
+          Number(config.label_width) || 120 // Lowered fallback from 320 to 120
         );
 
       // =========================
