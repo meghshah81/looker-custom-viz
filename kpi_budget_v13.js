@@ -164,8 +164,8 @@ const Utils = {
 
 looker.plugins.visualizations.add({
 
-  id: "kpi_budget_v12",
-  label: "KPI vs Budget v12",
+  id: "kpi_budget_v13",
+  label: "KPI vs Budget v13",
 
   options: {
     // HEADER
@@ -470,4 +470,27 @@ looker.plugins.visualizations.add({
 
             <div class="target-line" style="left:${targetPosition}%; height:${(config.bar_height || 12) + 12}px;"></div>
 
-            ${config.show_fourth_
+            ${config.show_fourth_measure ? `
+              <div class="fourth-label" style="left:${fourthPosition}%; transform:${fourthLabelTransform};">
+                ${config.fourth_measure_label_text || "Slots"}: ${fourthDisplay}
+              </div>
+              
+              <div class="fourth-line" style="left:${fourthPosition}%; height:${(config.bar_height || 12) + 12}px;"></div>
+            ` : ""}
+          </div>
+
+          ${config.show_axis ? `<div class="axis"><span>0</span><span>${axisMaxDisplay}</span></div>` : ""}
+
+          ${config.show_budget_percent && budgetPercent !== null ? `
+            <div class="budget-percent" style="color:${textColor};">${budgetPercent.toFixed(1)}% of budget</div>
+          ` : ""}
+        </div>
+      `;
+
+    } catch(e) {
+      console.error(e);
+      Utils.showError(root, "Unexpected Visualization Error\n\n" + e.message);
+    }
+    done();
+  }
+});
