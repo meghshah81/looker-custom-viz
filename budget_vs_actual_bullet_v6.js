@@ -5,12 +5,12 @@
 const Utils = {
 
 isValidNumber(value) { return ( value !== null && value !== undefined &&
-value !== “” && !isNaN(Number(value)) ); },
+value !== "" && !isNaN(Number(value)) ); },
 
 toNumber(value, defaultValue = 0) { return this.isValidNumber(value) ?
 Number(value) : defaultValue; },
 
-formatValue(cell, fallback = “0”) { if (!cell) return fallback;
+formatValue(cell, fallback = "0") { if (!cell) return fallback;
 
     return (
       cell.rendered ??
@@ -21,8 +21,7 @@ formatValue(cell, fallback = “0”) { if (!cell) return fallback;
 
 },
 
-safeText(value) { if (value === null || value === undefined) { return
-““; }
+safeText(value) { if (value === null || value === undefined) { return ""; }
 
     return String(value)
       .replace(/&/g, "&amp;")
@@ -71,9 +70,9 @@ attachDrill(element, cell) {
 
 looker.plugins.visualizations.add({
 
-id: “budget_vs_actual_bullet_v5”,
+id: "budget_vs_actual_bullet_v6",
 
-label: “Budget vs Actual Bullet v5”,
+label: "Budget vs Actual Bullet v6",
 
 options: {
 
