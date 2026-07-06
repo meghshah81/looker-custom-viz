@@ -70,9 +70,9 @@ attachDrill(element, cell) {
 
 looker.plugins.visualizations.add({
 
-id: "budget_vs_actual_bullet_v6",
+id: "budget_vs_actual_bullet_v7",
 
-label: "Budget vs Actual Bullet v6",
+label: "Budget vs Actual Bullet v7",
 
 options: {
 
