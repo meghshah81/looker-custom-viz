@@ -367,7 +367,7 @@ looker.plugins.visualizations.add({
         badge.innerText =
           arrow +
           " " +
-          (Math.abs(pct) * 100).toFixed(2) +
+          (Math.abs(pct) * 100).toFixed(1) +
           "%";
       }
 
