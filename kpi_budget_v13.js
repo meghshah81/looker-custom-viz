@@ -300,9 +300,7 @@ looker.plugins.visualizations.add({
       // COLORS & GRADIENTS
       // =====================================
       const isGood = actualValue >= budgetValue;
-      const barGradient = isGood 
-        ? "linear-gradient(90deg,#86efac 0%,#22c55e 100%)" 
-        : "linear-gradient(90deg,#fca5a5 0%,#ef4444 100%)";
+      const barColor = isGood ? "#57C596" : "#EF3440";
       const textColor = isGood ? "#16a34a" : "#dc2626";
 
       // =====================================
