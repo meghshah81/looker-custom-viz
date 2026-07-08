@@ -297,7 +297,7 @@ looker.plugins.visualizations.add({
       const budgetPercent = budgetValue !== 0 ? (actualValue / budgetValue) * 100 : null;
 
       // =====================================
-      // COLORS & GRADIENTS
+      // FIXED SOLID COLORS (UPDATED)
       // =====================================
       const isGood = actualValue >= budgetValue;
       const barColor = isGood ? "#57C596" : "#EF3440";
