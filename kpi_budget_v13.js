@@ -462,7 +462,7 @@ looker.plugins.visualizations.add({
 
           <div class="bar-wrap" style="height:${config.bar_height || 12}px;">
             
-            <div class="bar" style="width:${Math.min(barWidth, 100)}%; background:${barGradient};"></div>
+            <div class="bar" style="width:${Math.min(barWidth, 100)}%; background:${barColor};"></div>
 
             <div class="budget-label" style="left:${targetPosition}%; transform:${labelTransform};">${budgetDisplay}</div>
 
