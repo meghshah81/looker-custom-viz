@@ -164,8 +164,8 @@ const Utils = {
 
 looker.plugins.visualizations.add({
 
-  id: "kpi_budget_v13",
-  label: "KPI vs Budget v13",
+  id: "kpi_budget_v14",
+  label: "KPI vs Budget v14",
 
   options: {
     // HEADER
@@ -301,7 +301,7 @@ looker.plugins.visualizations.add({
       // =====================================
       const isGood = actualValue >= budgetValue;
       const barGradient = isGood ? "#57C596" : "#EF3440";
-      const textColor = isGood ? "#57C596" : "#EF3440";
+      const textColor = isGood ? "#16a34a" : "#dc2626";
 
       // =====================================
       // DYNAMIC GRAPH SCALE
