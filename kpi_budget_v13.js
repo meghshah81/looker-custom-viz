@@ -297,11 +297,11 @@ looker.plugins.visualizations.add({
       const budgetPercent = budgetValue !== 0 ? (actualValue / budgetValue) * 100 : null;
 
       // =====================================
-      // FIXED SOLID COLORS (UPDATED)
+      // FIXED SOLID COLORS (Variable name preserved to prevent template errors)
       // =====================================
       const isGood = actualValue >= budgetValue;
-      const barColor = isGood ? "#57C596" : "#EF3440";
-      const textColor = isGood ? "#16a34a" : "#dc2626";
+      const barGradient = isGood ? "#57C596" : "#EF3440";
+      const textColor = isGood ? "#57C596" : "#EF3440";
 
       // =====================================
       // DYNAMIC GRAPH SCALE
@@ -462,7 +462,7 @@ looker.plugins.visualizations.add({
 
           <div class="bar-wrap" style="height:${config.bar_height || 12}px;">
             
-            <div class="bar" style="width:${Math.min(barWidth, 100)}%; background:${barColor};"></div>
+            <div class="bar" style="width:${Math.min(barWidth, 100)}%; background:${barGradient};"></div>
 
             <div class="budget-label" style="left:${targetPosition}%; transform:${labelTransform};">${budgetDisplay}</div>
 
