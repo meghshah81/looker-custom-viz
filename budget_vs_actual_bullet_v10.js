@@ -203,10 +203,10 @@ looker.plugins.visualizations.add({
           font-size: 14px;
         }
         .bv-actual {
-          font-weight: 700;
           color: #0f2d5c;
         }
         .bv-budget {
+          font-weight: 700;
           color: #6b7280;
           margin-left: 4px;
         }
