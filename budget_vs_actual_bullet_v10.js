@@ -321,7 +321,7 @@ looker.plugins.visualizations.add({
       const barHeight = Math.max(8, Number(config.bar_height) || 16);
       
       // Strict layout footprints locked down directly to override cache bugs
-      const labelWidth = 85;   
+      const labelWidth = 150;   
       const valuesWidth = 145; 
       const gapSize = 8; // Fixed 8px gap on both sides of the visualization bar
 
