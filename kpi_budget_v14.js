@@ -78,11 +78,10 @@ const Utils = {
       const field = row[fieldName];
       if (field == null) return "—";
 
-      if (typeof field === "object" && field.rendered != null) {
-        return field.rendered;
-      }
-      if (typeof field === "object" && field.value != null) {
-        return field.value;
+      if (typeof field === "object") {
+        if (field.rendered != null) return field.rendered;
+        if (field.value != null) return field.value;
+        return "—"; // FIXED: Prevents returning raw {} which causes [object Object]
       }
       return field;
     } catch(e) {
@@ -130,14 +129,6 @@ const Utils = {
     return true;
   },
 
-  validateData(element, data) {
-    if (!data || !data.length) {
-      this.showError(element, "No data returned from query.");
-      return false;
-    }
-    return true;
-  },
-
   detectPivot(queryResponse) {
     return (
       queryResponse &&
@@ -168,7 +159,6 @@ looker.plugins.visualizations.add({
   label: "KPI vs Budget v14",
 
   options: {
-    // HEADER
     show_header: {
       type: "boolean",
       label: "Show Header",
@@ -184,13 +174,11 @@ looker.plugins.visualizations.add({
       label: "Header Font Size",
       default: 18
     },
-    // KPI
     kpi_font_size: {
       type: "number",
       label: "KPI Font Size",
       default: 48
     },
-    // BUDGET SECTION
     show_budget_section: {
       type: "boolean",
       label: "Show Actual vs Budget",
@@ -201,37 +189,31 @@ looker.plugins.visualizations.add({
       label: "Actual vs Budget Text",
       default: "Actual vs Budget"
     },
-    // 4TH MEASURE TOGGLE
     show_fourth_measure: {
       type: "boolean",
       label: "Enable 4th Measure Line",
       default: false
     },
-    // NEW: 4TH MEASURE CUSTOMIZABLE LABEL
     fourth_measure_label_text: {
       type: "string",
       label: "4th Measure Custom Label",
       default: "Slots"
     },
-    // BAR
     bar_height: {
       type: "number",
       label: "Bar Height",
       default: 12
     },
-    // AXIS
     show_axis: {
       type: "boolean",
       label: "Show Axis",
       default: false
     },
-    // BUDGET %
     show_budget_percent: {
       type: "boolean",
       label: "Show % of Budget",
       default: true
     },
-    // DEBUG
     debug_mode: {
       type: "boolean",
       label: "Debug Mode",
@@ -256,7 +238,7 @@ looker.plugins.visualizations.add({
       }
 
       // =====================================
-      // MEASURES VALIDATION (DYNAMIC DETERMINATION)
+      // MEASURES VALIDATION
       // =====================================
       const measures = Utils.getMeasures(queryResponse);
       const requiredCount = config.show_fourth_measure ? 4 : 3;
@@ -266,9 +248,42 @@ looker.plugins.visualizations.add({
       }
 
       // =====================================
-      // DATA CHECK
+      // DATA CHECK (NO RESULTS HANDLING)
       // =====================================
-      if (!Utils.validateData(root, data)) {
+      const hasNoData = !data || data.length === 0 || 
+                        (measures.length > 0 && data[0] && typeof data[0][measures[0].name] === "object" && 
+                         data[0][measures[0].name].value == null && data[0][measures[0].name].rendered == null);
+
+      if (hasNoData) {
+        root.innerHTML = `
+          <style>
+            .viz-wrap {
+              font-family: Inter, Arial, sans-serif;
+              padding: 16px;
+              color: #111827;
+            }
+            .header {
+              font-weight: 600;
+              margin-bottom: 20px;
+            }
+            .no-results-container {
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              min-height: 180px;
+              color: #6b7280;
+              font-size: 16px;
+              font-weight: 500;
+            }
+          </style>
+
+          <div class="viz-wrap">
+            ${config.show_header ? `<div class="header" style="font-size:${config.header_font_size || 18}px;">${config.header_text}</div>` : ""}
+            <div class="no-results-container">
+              No results
+            </div>
+          </div>
+        `;
         return done();
       }
 
@@ -297,7 +312,7 @@ looker.plugins.visualizations.add({
       const budgetPercent = budgetValue !== 0 ? (actualValue / budgetValue) * 100 : null;
 
       // =====================================
-      // FIXED SOLID COLORS (Variable name preserved to prevent template errors)
+      // FIXED SOLID COLORS
       // =====================================
       const isGood = actualValue >= budgetValue;
       const barGradient = isGood ? "#57C596" : "#EF3440";
