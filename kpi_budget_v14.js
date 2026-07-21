@@ -369,6 +369,7 @@ looker.plugins.visualizations.add({
           .main-value {
             font-weight: 700;
             line-height: 1.1;
+            cursor: pointer; /* Added to indicate clickability */
           }
           .comparison-row {
             margin-top: 10px;
@@ -499,6 +500,19 @@ looker.plugins.visualizations.add({
           ` : ""}
         </div>
       `;
+
+      // =====================================
+      // LOOKER NATIVE DRILL DOWN TRIGGER
+      // =====================================
+      const mainKpiElement = root.querySelector(".main-value");
+      if (mainKpiElement && row[measures[0].name] && row[measures[0].name].links) {
+        mainKpiElement.addEventListener("click", function(event) {
+          LookerCharts.Utils.openDrillMenu({
+            links: row[measures[0].name].links,
+            event: event
+          });
+        });
+      }
 
     } catch(e) {
       console.error(e);
