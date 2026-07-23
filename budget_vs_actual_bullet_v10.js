@@ -35,21 +35,7 @@ const Utils = {
   percent(value, total) { 
     if (!this.isValidNumber(total) || Number(total) === 0) { return 0; }
     return (Number(value) / Number(total)) * 100;
-  },
-
-  attachDrill(element, cell) {
-    if (!cell || !cell.links || !cell.links.length) {
-      return;
-    }
-    element.style.cursor = "pointer";
-    element.addEventListener("click", function (event) {
-      event.stopPropagation();
-      LookerCharts.Utils.openDrillMenu({
-        links: cell.links,
-        event: event
-      });
-    });
-  } 
+  }
 };
 
 // ========================= 
@@ -394,7 +380,7 @@ looker.plugins.visualizations.add({
           </div>
 
           <div 
-            class="bv-values bv-drillable"
+            class="bv-values"
             style="
               width: ${valuesWidth}px;
               min-width: ${valuesWidth}px;
@@ -418,12 +404,6 @@ looker.plugins.visualizations.add({
         `;
 
         wrapper.appendChild(rowEl);
-
-        // =========================
-        // DRILL SUPPORT
-        // =========================
-        const drillTarget = rowEl.querySelector(".bv-drillable");
-        Utils.attachDrill(drillTarget, actualCell);
       });
 
       // =========================
