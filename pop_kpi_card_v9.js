@@ -342,7 +342,7 @@ looker.plugins.visualizations.add({
         (config.title_font_size || 18) + "px";
 
       // =====================================================
-      // KPI VALUE
+      // KPI VALUE & DRILL DOWN (1,435 Value)
       // =====================================================
 
       kpi.innerText =
@@ -350,6 +350,17 @@ looker.plugins.visualizations.add({
 
       kpi.style.fontSize =
         (config.kpi_font_size || 52) + "px";
+
+      // Added: Check for looker native drill links and attach event listener
+      if (selectedCell && selectedCell.links && selectedCell.links.length > 0) {
+        kpi.style.cursor = "pointer";
+        kpi.addEventListener("click", function (event) {
+          LookerCharts.Utils.openDrillMenu({
+            links: selectedCell.links,
+            event: event
+          });
+        });
+      }
 
       // =====================================================
       // BADGE
@@ -388,19 +399,30 @@ looker.plugins.visualizations.add({
         (config.compare_font_size || 16) + "px";
 
       // =====================================================
-      // FOOTER
+      // FOOTER & DRILL DOWN (1,385 Value)
       // =====================================================
 
       if (config.show_footer) {
 
         footer.style.display = "block";
-
-        footer.innerText =
-          "Prior: " +
-          formatValue(previousCell);
+        
+        // Added: Wrapped value inside a span to isolate click events to just the number string
+        footer.innerHTML = `Prior: <span id="footer-val">${formatValue(previousCell)}</span>`;
 
         footer.style.fontSize =
           (config.footer_font_size || 16) + "px";
+
+        // Added: Check for looker native drill links on the prior value field and attach click handler
+        const footerVal = element.querySelector("#footer-val");
+        if (previousCell && previousCell.links && previousCell.links.length > 0) {
+          footerVal.style.cursor = "pointer";
+          footerVal.addEventListener("click", function (event) {
+            LookerCharts.Utils.openDrillMenu({
+              links: previousCell.links,
+              event: event
+            });
+          });
+        }
 
       } else {
 
@@ -428,14 +450,6 @@ looker.plugins.visualizations.add({
 
     function formatValue(cell) {
 
-      // Use Looker's native rendered value
-      // This preserves:
-      // %
-      // $
-      // commas
-      // decimals
-      // abbreviations etc.
-
       if (
         cell &&
         cell.rendered !== undefined &&
@@ -444,8 +458,6 @@ looker.plugins.visualizations.add({
 
         return cell.rendered;
       }
-
-      // fallback
 
       return Number(
         cell?.value || 0
