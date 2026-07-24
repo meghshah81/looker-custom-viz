@@ -175,9 +175,9 @@ looker.plugins.visualizations.add({
         let key = rawDateStr; // Fallback default
 
         if (this.currentGrain === "week") {
-          // Roll back to the start of the week (Sunday code baseline)
+          // Changed: Roll back to the start of the week using Monday as the baseline boundary
           const day = dateObj.getDay();
-          const diff = dateObj.getDate() - day;
+          const diff = dateObj.getDate() - (day === 0 ? 6 : day - 1);
           const weekStart = new Date(dateObj.setDate(diff));
           key = weekStart.toISOString().split("T")[0];
         } else if (this.currentGrain === "month") {
