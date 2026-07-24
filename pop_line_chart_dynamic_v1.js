@@ -162,7 +162,7 @@ looker.plugins.visualizations.add({
         e.stopPropagation();
 
         this.currentGrain = e.target.getAttribute("data-grain");
-        this.isFrontendToggleAction = true; // Set manual flag tracker
+        this.isFrontendToggleAction = true; 
 
         element.querySelectorAll(".toggle-btn").forEach(b => b.classList.remove("active"));
         e.target.classList.add("active");
@@ -171,7 +171,32 @@ looker.plugins.visualizations.add({
     });
 
     // =====================================================
-    // DYNAMIC DATA PROCESSING & AGGREGATION ENGINE
+    // AUTOMATIC METRIC TYPE & SCALE DETECTION ENGINE
+    // =====================================================
+    let isPercent = false;
+    let needsScaling = false; // True if Looker stores 12.5% as a decimal fraction like 0.125
+
+    if (measures[0].value_format && measures[0].value_format.includes('%')) {
+      isPercent = true;
+    }
+
+    for (let i = 0; i < data.length; i++) {
+      const pivotData = data[i][measureName];
+      if (!pivotData) continue;
+      
+      for (const pKey of Object.keys(pivotData)) {
+        const cell = pivotData[pKey];
+        if (cell && cell.rendered && cell.rendered.includes('%')) {
+          isPercent = true;
+          if (cell.value !== 0 && Math.abs(cell.value) <= 1 && !cell.rendered.includes(String(cell.value))) {
+            needsScaling = true;
+          }
+        }
+      }
+    }
+
+    // =====================================================
+    // DYNAMIC DATA PROCESSING ENGINE
     // =====================================================
     const processAndRender = () => {
       const aggregations = {};
@@ -195,7 +220,10 @@ looker.plugins.visualizations.add({
         }
 
         if (!aggregations[key]) {
-          aggregations[key] = { selected: 0, previous: 0 };
+          aggregations[key] = { 
+            selectedSum: 0, selectedCount: 0, 
+            previousSum: 0, previousCount: 0 
+          };
         }
 
         const pivotData = row[measureName];
@@ -203,9 +231,11 @@ looker.plugins.visualizations.add({
           Object.keys(pivotData).forEach(pivotKey => {
             const val = pivotData[pivotKey]?.value || 0;
             if (pivotKey.toLowerCase().includes("selected")) {
-              aggregations[key].selected += val;
+              aggregations[key].selectedSum += val;
+              aggregations[key].selectedCount++;
             } else if (pivotKey.toLowerCase().includes("previous") || pivotKey.toLowerCase().includes("comparison")) {
-              aggregations[key].previous += val;
+              aggregations[key].previousSum += val;
+              aggregations[key].previousCount++;
             }
           });
         }
@@ -224,42 +254,68 @@ looker.plugins.visualizations.add({
         }
       });
 
-      const selectedData = sortedKeys.map(key => aggregations[key].selected);
-      const previousData = sortedKeys.map(key => aggregations[key].previous);
+      // Compute aggregates: Sum for regular counts, Average for rate/percentage calculations
+      const selectedData = sortedKeys.map(key => {
+        const agg = aggregations[key];
+        if (isPercent) {
+          const avg = agg.selectedCount > 0 ? (agg.selectedSum / agg.selectedCount) : 0;
+          return needsScaling ? avg * 100 : avg;
+        }
+        return agg.selectedSum;
+      });
+
+      const previousData = sortedKeys.map(key => {
+        const agg = aggregations[key];
+        if (isPercent) {
+          const avg = agg.previousCount > 0 ? (agg.previousSum / agg.previousCount) : 0;
+          return needsScaling ? avg * 100 : avg;
+        }
+        return agg.previousSum;
+      });
 
       // =====================================================
       // CHART GENERATION / UPDATE CONFIGURATION
       // =====================================================
       const ctx = element.querySelector("#popLineChart").getContext("2d");
-
-      // Determine animation mode baseline context state
       let animationMode = undefined; 
       
-      // Fix for Point 3: if Looker calls updateAsync but data has NOT changed, and it wasn't a manual toggle click, kill animations completely
       if (details && details.changed && !details.changed.data && !this.isFrontendToggleAction) {
         animationMode = 'none';
       }
       
-      // Reset the toggle click tracker flag safely
       this.isFrontendToggleAction = false;
 
+      // Formatting callbacks to clean up Y-axis labels and popover tooltips
+      const yAxisCallback = function(value) {
+        return isPercent ? value.toFixed(1) + '%' : value.toLocaleString();
+      };
+
+      const tooltipCallback = function(context) {
+        let label = context.dataset.label || '';
+        if (label) label += ': ';
+        if (context.parsed.y !== null) {
+          label += isPercent ? context.parsed.y.toFixed(1) + '%' : context.parsed.y.toLocaleString();
+        }
+        return label;
+      };
+
       if (this.chartInstance) {
-        // Dynamic chart property value mutations
         this.chartInstance.data.labels = labels;
         
-        // Selected Period Adjustments
         this.chartInstance.data.datasets[0].label = config.legend_label_selected || "Selected Period";
         this.chartInstance.data.datasets[0].data = selectedData;
         this.chartInstance.data.datasets[0].borderColor = config.line_color_selected || "#1ad1ff";
         
-        // Previous Period Adjustments
         this.chartInstance.data.datasets[1].label = config.legend_label_previous || "Comparison Period";
         this.chartInstance.data.datasets[1].data = previousData;
         this.chartInstance.data.datasets[1].borderColor = config.line_color_previous || "#0f2d5c";
         
+        // Push dynamic changes into config instances safely
+        this.chartInstance.options.scales.y.ticks.callback = yAxisCallback;
+        this.chartInstance.options.plugins.tooltip.callbacks.label = tooltipCallback;
+
         this.chartInstance.update(animationMode);
       } else {
-        // Initial setup pass construct
         this.chartInstance = new Chart(ctx, {
           type: "line",
           data: {
@@ -296,33 +352,34 @@ looker.plugins.visualizations.add({
                 position: "bottom",
                 labels: {
                   boxWidth: 24,
-                  usePointStyle: true,    // Fix for Point 2: Changes icons to match shapes instead of rectangles
-                  pointStyle: 'line',     // Fix for Point 2: Renders legend icons cleanly as straight lines
+                  usePointStyle: true,    
+                  pointStyle: 'line',     
                   font: { size: 12, weight: "500" },
                   color: "#4b5563"
                 }
               },
               tooltip: {
                 mode: "index",
-                intersect: false
+                intersect: false,
+                callbacks: {
+                  label: tooltipCallback
+                }
               }
             },
             scales: {
               x: {
-                grid: { display: false }, // Fix for Point 1: Removes grid lines completely
+                grid: { display: false }, 
                 ticks: {
                   color: "#6b7280",
                   font: { size: 11 }
                 }
               },
               y: {
-                grid: { display: false }, // Fix for Point 1: Removes grid lines completely
+                grid: { display: false }, 
                 ticks: {
                   color: "#6b7280",
                   font: { size: 11 },
-                  callback: function(value) {
-                    return value.toLocaleString();
-                  }
+                  callback: yAxisCallback
                 }
               }
             }
