@@ -152,6 +152,10 @@ looker.plugins.visualizations.add({
     // Attach active event listeners to new button triggers
     element.querySelectorAll(".toggle-btn").forEach(btn => {
       btn.addEventListener("click", (e) => {
+        // Fix: Force Looker to completely drop handling this specific mouse interaction loop
+        e.preventDefault();
+        e.stopPropagation();
+
         this.currentGrain = e.target.getAttribute("data-grain");
         element.querySelectorAll(".toggle-btn").forEach(b => b.classList.remove("active"));
         e.target.classList.add("active");
@@ -162,7 +166,7 @@ looker.plugins.visualizations.add({
     // =====================================================
     // DYNAMIC DATA PROCESSING & AGGREGATION ENGINE
     // =====================================================
-    function processAndRender() {
+    const processAndRender = () => {
       const aggregations = {};
 
       data.forEach(row => {
@@ -175,7 +179,7 @@ looker.plugins.visualizations.add({
         let key = rawDateStr; // Fallback default
 
         if (this.currentGrain === "week") {
-          // Changed: Roll back to the start of the week using Monday as the baseline boundary
+          // Roll back to the start of the week using Monday as the baseline boundary
           const day = dateObj.getDay();
           const diff = dateObj.getDate() - (day === 0 ? 6 : day - 1);
           const weekStart = new Date(dateObj.setDate(diff));
@@ -300,7 +304,7 @@ looker.plugins.visualizations.add({
     }
 
     // Execute first run pass
-    processAndRender.call(this);
+    processAndRender();
     done();
   }
 });
