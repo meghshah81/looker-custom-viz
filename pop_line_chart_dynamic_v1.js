@@ -6,7 +6,7 @@ if (!window.Chart) {
 }
 
 looker.plugins.visualizations.add({
-  id: "pop_line_chart_dynamic",
+  id: "pop_line_chart_dynamic_v1",
   label: "POP Line Chart with Dynamic X-Axis",
 
   options: {
