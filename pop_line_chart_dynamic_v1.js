@@ -28,6 +28,13 @@ looker.plugins.visualizations.add({
       label: "Value Labels",
       default: false,
       section: "Plot"
+    },
+    advanced_json_config: {
+      type: "string",
+      label: "Advanced Chart.js JSON Overrides",
+      default: "{}",
+      placeholder: '{"scales": {"y": {"grid": {"color": "#e2e8f0"}}}}',
+      section: "Plot"
     }
   },
 
@@ -174,7 +181,8 @@ looker.plugins.visualizations.add({
     // =====================================================
     const dynamicOptions = {
       global_point_style: this.options.global_point_style,
-      global_value_labels: this.options.global_value_labels
+      global_value_labels: this.options.global_value_labels,
+      advanced_json_config: this.options.advanced_json_config
     };
 
     Object.keys(seriesMap).forEach((sId, idx) => {
@@ -210,7 +218,6 @@ looker.plugins.visualizations.add({
       };
     });
 
-    // Safeguard to register configuration modifications only when fields change layout shapes
     const schemaKeys = Object.keys(dynamicOptions);
     if (!this.registeredKeys || JSON.stringify(this.registeredKeys) !== JSON.stringify(schemaKeys)) {
       this.trigger('registerOptions', dynamicOptions);
@@ -281,7 +288,6 @@ looker.plugins.visualizations.add({
       measureSpecs[m.name] = { isPercent, needsScaling };
     });
 
-    // Utility to transform hex values securely to smooth transparent rgba backgrounds for the area setting
     function hexToRgba(hex, alpha) {
       let c;
       if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
@@ -365,7 +371,6 @@ looker.plugins.visualizations.add({
         }
       });
 
-      // Map out individual custom dataset parameters
       const datasets = Object.keys(seriesMap).map((sId, idx) => {
         const spec = seriesMap[sId];
         const mSpec = measureSpecs[spec.measureName];
@@ -412,10 +417,8 @@ looker.plugins.visualizations.add({
         };
       });
 
-      // Check if general formatting trends require a percent localized axis setup
       const primaryIsPercent = datasets.length > 0 ? datasets[0].isPercent : false;
 
-      // Formatting axis and tooltip logic dynamically
       const yAxisCallback = function(value) {
         return primaryIsPercent ? value.toFixed(1) + '%' : value.toLocaleString();
       };
@@ -429,13 +432,17 @@ looker.plugins.visualizations.add({
         return label;
       };
 
-      // Inline Canvas Engine Plugin to render value labels perfectly without external plugin CDNs
+      // =====================================================
+      // DYNAMIC VALUE LABELS ENGINE (RUNTIME RE-BOUND)
+      // =====================================================
       const valueLabelsPlugin = {
         id: "valueLabelsPlugin",
         afterDatasetsDraw: (chart) => {
-          if (!config.global_value_labels) return;
-          const ctx = chart.ctx;
+          // Explicitly reads live configuration parameters inside chart context to avoid closure drops
+          const valueLabelsConfig = chart.options.plugins.valueLabels;
+          if (!valueLabelsConfig || !valueLabelsConfig.enabled) return;
           
+          const ctx = chart.ctx;
           chart.data.datasets.forEach((dataset, datasetIdx) => {
             const meta = chart.getDatasetMeta(datasetIdx);
             if (meta.hidden) return;
@@ -450,12 +457,74 @@ looker.plugins.visualizations.add({
               ctx.textAlign = "center";
               ctx.textBaseline = "bottom";
               
-              // Shift above points neatly
+              // Place text precisely above the point elements cleanly
               ctx.fillText(formatted, element.x, element.y - 7);
             });
           });
         }
       };
+
+      // Handle custom user configuration manual override injection rules securely
+      let parsedOverrides = {};
+      if (config.advanced_json_config && config.advanced_json_config !== "{}") {
+        try {
+          parsedOverrides = JSON.parse(config.advanced_json_config);
+        } catch (jsonErr) {
+          console.error("Looker Visual Configuration Override Error - Invalid JSON Syntax Passed:", jsonErr);
+        }
+      }
+
+      // Base Options Framework
+      const chartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {
+          padding: { top: 18 } // Prevents top dataset point text values from ever rubbing grid ceilings
+        },
+        plugins: {
+          valueLabels: {
+            enabled: config.global_value_labels || false
+          },
+          legend: {
+            display: true,
+            position: "bottom",
+            labels: {
+              boxWidth: 24,
+              usePointStyle: true,    
+              pointStyle: 'line',     
+              font: { size: 12, weight: "500" },
+              color: "#4b5563"
+            }
+          },
+          tooltip: {
+            mode: "index",
+            intersect: false,
+            callbacks: {
+              label: tooltipCallback
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false }, 
+            ticks: {
+              color: "#6b7280",
+              font: { size: 11 }
+            }
+          },
+          y: {
+            grid: { display: false }, 
+            ticks: {
+              color: "#6b7280",
+              font: { size: 11 },
+              callback: yAxisCallback
+            }
+          }
+        }
+      };
+
+      // Safely apply advanced manual developer customization rules
+      Object.assign(chartOptions, parsedOverrides);
 
       // =====================================================
       // INSTANTIATION OR UPDATE ENGINE
@@ -471,8 +540,10 @@ looker.plugins.visualizations.add({
       if (this.chartInstance) {
         this.chartInstance.data.labels = labels;
         this.chartInstance.data.datasets = datasets;
-        this.chartInstance.options.scales.y.ticks.callback = yAxisCallback;
-        this.chartInstance.options.plugins.tooltip.callbacks.label = tooltipCallback;
+        
+        // Re-inject live custom settings mapping variables securely
+        this.chartInstance.options = chartOptions;
+        
         this.chartInstance.update(animationMode);
       } else {
         this.chartInstance = new Chart(ctx, {
@@ -482,47 +553,7 @@ looker.plugins.visualizations.add({
             datasets: datasets
           },
           plugins: [valueLabelsPlugin],
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                display: true,
-                position: "bottom",
-                labels: {
-                  boxWidth: 24,
-                  usePointStyle: true,    
-                  pointStyle: 'line',     
-                  font: { size: 12, weight: "500" },
-                  color: "#4b5563"
-                }
-              },
-              tooltip: {
-                mode: "index",
-                intersect: false,
-                callbacks: {
-                  label: tooltipCallback
-                }
-              }
-            },
-            scales: {
-              x: {
-                grid: { display: false }, 
-                ticks: {
-                  color: "#6b7280",
-                  font: { size: 11 }
-                }
-              },
-              y: {
-                grid: { display: false }, 
-                ticks: {
-                  color: "#6b7280",
-                  font: { size: 11 },
-                  callback: yAxisCallback
-                }
-              }
-            }
-          }
+          options: chartOptions
         });
       }
     };
