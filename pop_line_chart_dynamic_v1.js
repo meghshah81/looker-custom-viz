@@ -29,11 +29,12 @@ looker.plugins.visualizations.add({
       default: false,
       section: "Plot"
     },
-    advanced_json_config: {
+    global_value_label_color: {
       type: "string",
-      label: "Advanced Chart.js JSON Overrides",
-      default: "{}",
-      placeholder: '{"scales": {"y": {"grid": {"color": "#e2e8f0"}}}}',
+      label: "Value Label Color Override",
+      default: "",
+      display: "color",
+      placeholder: "Defaults to matching line color",
       section: "Plot"
     }
   },
@@ -182,7 +183,7 @@ looker.plugins.visualizations.add({
     const dynamicOptions = {
       global_point_style: this.options.global_point_style,
       global_value_labels: this.options.global_value_labels,
-      advanced_json_config: this.options.advanced_json_config
+      global_value_label_color: this.options.global_value_label_color
     };
 
     Object.keys(seriesMap).forEach((sId, idx) => {
@@ -433,12 +434,11 @@ looker.plugins.visualizations.add({
       };
 
       // =====================================================
-      // DYNAMIC VALUE LABELS ENGINE (RUNTIME RE-BOUND)
+      // STATE-AWARE VALUE LABELS ENGINE
       // =====================================================
       const valueLabelsPlugin = {
         id: "valueLabelsPlugin",
         afterDatasetsDraw: (chart) => {
-          // Explicitly reads live configuration parameters inside chart context to avoid closure drops
           const valueLabelsConfig = chart.options.plugins.valueLabels;
           if (!valueLabelsConfig || !valueLabelsConfig.enabled) return;
           
@@ -452,38 +452,30 @@ looker.plugins.visualizations.add({
               if (val === null || val === undefined) return;
 
               const formatted = dataset.isPercent ? val.toFixed(1) + '%' : val.toLocaleString();
-              ctx.fillStyle = "#4b5563";
+              
+              // Fallback directly to the dataset's specific border line color if no global override color is specified
+              ctx.fillStyle = valueLabelsConfig.colorOverride || dataset.borderColor || "#4b5563";
               ctx.font = "600 10px Roboto, Arial, sans-serif";
               ctx.textAlign = "center";
               ctx.textBaseline = "bottom";
               
-              // Place text precisely above the point elements cleanly
+              // Place text precisely above the data point circle elements
               ctx.fillText(formatted, element.x, element.y - 7);
             });
           });
         }
       };
 
-      // Handle custom user configuration manual override injection rules securely
-      let parsedOverrides = {};
-      if (config.advanced_json_config && config.advanced_json_config !== "{}") {
-        try {
-          parsedOverrides = JSON.parse(config.advanced_json_config);
-        } catch (jsonErr) {
-          console.error("Looker Visual Configuration Override Error - Invalid JSON Syntax Passed:", jsonErr);
-        }
-      }
-
-      // Base Options Framework
       const chartOptions = {
         responsive: true,
         maintainAspectRatio: false,
         layout: {
-          padding: { top: 18 } // Prevents top dataset point text values from ever rubbing grid ceilings
+          padding: { top: 18 } // Extra ceiling padding so highest labels don't get truncated
         },
         plugins: {
           valueLabels: {
-            enabled: config.global_value_labels || false
+            enabled: config.global_value_labels || false,
+            colorOverride: config.global_value_label_color || ""
           },
           legend: {
             display: true,
@@ -523,9 +515,6 @@ looker.plugins.visualizations.add({
         }
       };
 
-      // Safely apply advanced manual developer customization rules
-      Object.assign(chartOptions, parsedOverrides);
-
       // =====================================================
       // INSTANTIATION OR UPDATE ENGINE
       // =====================================================
@@ -540,10 +529,7 @@ looker.plugins.visualizations.add({
       if (this.chartInstance) {
         this.chartInstance.data.labels = labels;
         this.chartInstance.data.datasets = datasets;
-        
-        // Re-inject live custom settings mapping variables securely
         this.chartInstance.options = chartOptions;
-        
         this.chartInstance.update(animationMode);
       } else {
         this.chartInstance = new Chart(ctx, {
