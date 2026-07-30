@@ -6,7 +6,7 @@ if (!window.Chart) {
 }
 
 looker.plugins.visualizations.add({
-  id: "pop_line_chart_dynamic_v1",
+  id: "pop_line_chart_dynamic_v2",
   label: "Dynamic Multi-Measure PoP Line & Area Chart",
 
   // Base configurations initialized immediately
