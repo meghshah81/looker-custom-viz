@@ -7,32 +7,27 @@ if (!window.Chart) {
 
 looker.plugins.visualizations.add({
   id: "pop_line_chart_dynamic_v1",
-  label: "POP Line Chart with Dynamic X-Axis",
+  label: "Dynamic Multi-Measure PoP Line & Area Chart",
 
+  // Base configurations initialized immediately
   options: {
-    legend_label_selected: {
+    global_point_style: {
       type: "string",
-      label: "Selected Period Legend Label",
-      default: "Selected Period",
-      section: "Style"
+      label: "Point Style",
+      default: "none",
+      display: "select",
+      values: [
+        { "None": "none" },
+        { "Filled": "filled" },
+        { "Outline": "outline" }
+      ],
+      section: "Plot"
     },
-    line_color_selected: {
-      type: "string",
-      label: "Selected Period Line Color",
-      default: "#1ad1ff",
-      section: "Style"
-    },
-    legend_label_previous: {
-      type: "string",
-      label: "Previous Period Legend Label",
-      default: "Comparison Period",
-      section: "Style"
-    },
-    line_color_previous: {
-      type: "string",
-      label: "Previous Period Line Color",
-      default: "#0f2d5c",
-      section: "Style"
+    global_value_labels: {
+      type: "boolean",
+      label: "Value Labels",
+      default: false,
+      section: "Plot"
     }
   },
 
@@ -122,20 +117,18 @@ looker.plugins.visualizations.add({
     const measures = queryResponse.fields.measure_like || [];
     const pivots = queryResponse.fields.pivots || [];
 
-    if (dimensions.length < 1 || measures.length < 1 || pivots.length < 1) {
+    if (dimensions.length < 1 || measures.length < 1) {
       container.style.display = "none";
       const errorDiv = document.createElement("div");
       errorDiv.className = "error-box";
-      errorDiv.innerHTML = "<strong>Requirements Missing:</strong> This visual requires 1 Dimension (Date), 1 Pivot Dimension (Period Profile), and 1 Measure.";
+      errorDiv.innerHTML = "<strong>Requirements Missing:</strong> This visual requires at least 1 Dimension (Date) and 1 or more Measures.";
       element.appendChild(errorDiv);
       done();
       return;
     }
 
     container.style.display = "flex";
-
     const dateDimName = dimensions[0].name;
-    const measureName = measures[0].name;
 
     if (!window.Chart) {
       setTimeout(() => this.updateAsync(data, element, config, queryResponse, details, done), 100);
@@ -146,6 +139,85 @@ looker.plugins.visualizations.add({
       this.currentGrain = "week";
     }
 
+    // =====================================================
+    // DYNAMIC SERIES DISCOVERY ENGINE & PALETTE MAP
+    // =====================================================
+    const defaultPalette = ["#1ad1ff", "#0f2d5c", "#7c3aed", "#f59e0b", "#10b981", "#ef4444", "#ec4899"];
+    const seriesMap = {};
+    const pivotDefs = queryResponse.pivots || [];
+
+    measures.forEach(m => {
+      if (pivotDefs.length > 0) {
+        pivotDefs.forEach(p => {
+          const seriesId = `${m.name}___${p.key}`.replace(/\./g, '_');
+          const pivotLabel = Object.values(p.metadata).map(meta => meta.value).join(' - ') || p.key;
+          seriesMap[seriesId] = {
+            id: seriesId,
+            measureName: m.name,
+            pivotKey: p.key,
+            label: `${m.label} (${pivotLabel})`
+          };
+        });
+      } else {
+        const seriesId = m.name.replace(/\./g, '_');
+        seriesMap[seriesId] = {
+          id: seriesId,
+          measureName: m.name,
+          pivotKey: null,
+          label: m.label
+        };
+      }
+    });
+
+    // =====================================================
+    // AUTOMATED DYNAMIC CONFIGURATION INJECTION
+    // =====================================================
+    const dynamicOptions = {
+      global_point_style: this.options.global_point_style,
+      global_value_labels: this.options.global_value_labels
+    };
+
+    Object.keys(seriesMap).forEach((sId, idx) => {
+      const spec = seriesMap[sId];
+      const fallbackColor = defaultPalette[idx % defaultPalette.length];
+
+      dynamicOptions[`label_${sId}`] = {
+        type: "string",
+        label: `Label: ${spec.label}`,
+        default: spec.label,
+        section: "Series Styles"
+      };
+      dynamicOptions[`color_${sId}`] = {
+        type: "string",
+        label: `Color: ${spec.label}`,
+        default: fallbackColor,
+        display: "color",
+        section: "Series Styles"
+      };
+      dynamicOptions[`linestyle_${sId}`] = {
+        type: "string",
+        label: `Line Style: ${spec.label}`,
+        default: "solid",
+        display: "select",
+        values: [{ "Solid": "solid" }, { "Dashed": "dashed" }],
+        section: "Series Styles"
+      };
+      dynamicOptions[`area_${sId}`] = {
+        type: "boolean",
+        label: `Show Area: ${spec.label}`,
+        default: false,
+        section: "Series Styles"
+      };
+    });
+
+    // Safeguard to register configuration modifications only when fields change layout shapes
+    const schemaKeys = Object.keys(dynamicOptions);
+    if (!this.registeredKeys || JSON.stringify(this.registeredKeys) !== JSON.stringify(schemaKeys)) {
+      this.trigger('registerOptions', dynamicOptions);
+      this.registeredKeys = schemaKeys;
+    }
+
+    // Handle Top Temporal Grain Navigation Bar
     const buttons = element.querySelectorAll(".toggle-btn");
     buttons.forEach(btn => {
       btn.classList.toggle("active", btn.getAttribute("data-grain") === this.currentGrain);
@@ -160,10 +232,8 @@ looker.plugins.visualizations.add({
       btn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-
         this.currentGrain = e.target.getAttribute("data-grain");
         this.isFrontendToggleAction = true; 
-
         element.querySelectorAll(".toggle-btn").forEach(b => b.classList.remove("active"));
         e.target.classList.add("active");
         processAndRender();
@@ -173,30 +243,60 @@ looker.plugins.visualizations.add({
     // =====================================================
     // AUTOMATIC METRIC TYPE & SCALE DETECTION ENGINE
     // =====================================================
-    let isPercent = false;
-    let needsScaling = false; // True if Looker stores 12.5% as a decimal fraction like 0.125
+    const measureSpecs = {};
+    measures.forEach(m => {
+      let isPercent = false;
+      let needsScaling = false;
 
-    if (measures[0].value_format && measures[0].value_format.includes('%')) {
-      isPercent = true;
-    }
+      if (m.value_format && m.value_format.includes('%')) {
+        isPercent = true;
+      }
 
-    for (let i = 0; i < data.length; i++) {
-      const pivotData = data[i][measureName];
-      if (!pivotData) continue;
-      
-      for (const pKey of Object.keys(pivotData)) {
-        const cell = pivotData[pKey];
-        if (cell && cell.rendered && cell.rendered.includes('%')) {
-          isPercent = true;
-          if (cell.value !== 0 && Math.abs(cell.value) <= 1 && !cell.rendered.includes(String(cell.value))) {
-            needsScaling = true;
+      for (let i = 0; i < data.length; i++) {
+        const cellContainer = data[i][m.name];
+        if (!cellContainer) continue;
+        
+        if (pivotDefs.length > 0) {
+          for (const pKey of Object.keys(cellContainer)) {
+            const cell = cellContainer[pKey];
+            if (cell && cell.rendered && cell.rendered.includes('%')) {
+              isPercent = true;
+              if (cell.value !== 0 && Math.abs(cell.value) <= 1 && !cell.rendered.includes(String(cell.value))) {
+                needsScaling = true;
+              }
+              break;
+            }
+          }
+        } else {
+          const cell = cellContainer;
+          if (cell && cell.rendered && cell.rendered.includes('%')) {
+            isPercent = true;
+            if (cell.value !== 0 && Math.abs(cell.value) <= 1 && !cell.rendered.includes(String(cell.value))) {
+              needsScaling = true;
+            }
           }
         }
+        if (isPercent) break;
       }
+      measureSpecs[m.name] = { isPercent, needsScaling };
+    });
+
+    // Utility to transform hex values securely to smooth transparent rgba backgrounds for the area setting
+    function hexToRgba(hex, alpha) {
+      let c;
+      if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
+        c= hex.substring(1).split('');
+        if(c.length === 3){
+          c= [c[0], c[0], c[1], c[1], c[2], c[2]];
+        }
+        c= '0x'+c.join('');
+        return 'rgba('+[(c>>16)&255, (c>>8)&255, c&255].join(',')+','+alpha+')';
+      }
+      return hex;
     }
 
     // =====================================================
-    // DYNAMIC DATA PROCESSING ENGINE
+    // MULTI-MEASURE AGGREGATION ENGINE
     // =====================================================
     const processAndRender = () => {
       const aggregations = {};
@@ -209,7 +309,6 @@ looker.plugins.visualizations.add({
         if (isNaN(dateObj.getTime())) return; 
 
         let key = rawDateStr;
-
         if (this.currentGrain === "week") {
           const day = dateObj.getDay();
           const diff = dateObj.getDate() - (day === 0 ? 6 : day - 1);
@@ -220,25 +319,37 @@ looker.plugins.visualizations.add({
         }
 
         if (!aggregations[key]) {
-          aggregations[key] = { 
-            selectedSum: 0, selectedCount: 0, 
-            previousSum: 0, previousCount: 0 
-          };
-        }
-
-        const pivotData = row[measureName];
-        if (pivotData) {
-          Object.keys(pivotData).forEach(pivotKey => {
-            const val = pivotData[pivotKey]?.value || 0;
-            if (pivotKey.toLowerCase().includes("selected")) {
-              aggregations[key].selectedSum += val;
-              aggregations[key].selectedCount++;
-            } else if (pivotKey.toLowerCase().includes("previous") || pivotKey.toLowerCase().includes("comparison")) {
-              aggregations[key].previousSum += val;
-              aggregations[key].previousCount++;
-            }
+          aggregations[key] = {};
+          Object.keys(seriesMap).forEach(sId => {
+            aggregations[key][sId] = { sum: 0, count: 0 };
           });
         }
+
+        Object.keys(seriesMap).forEach(sId => {
+          const spec = seriesMap[sId];
+          const cellContainer = row[spec.measureName];
+          if (!cellContainer) return;
+
+          let val = 0;
+          let validVal = false;
+
+          if (spec.pivotKey) {
+            if (cellContainer[spec.pivotKey] && cellContainer[spec.pivotKey].value !== null) {
+              val = cellContainer[spec.pivotKey].value;
+              validVal = true;
+            }
+          } else {
+            if (cellContainer.value !== null) {
+              val = cellContainer.value;
+              validVal = true;
+            }
+          }
+
+          if (validVal) {
+            aggregations[key][sId].sum += val;
+            aggregations[key][sId].count++;
+          }
+        });
       });
 
       const sortedKeys = Object.keys(aggregations).sort();
@@ -254,27 +365,100 @@ looker.plugins.visualizations.add({
         }
       });
 
-      // Compute aggregates: Sum for regular counts, Average for rate/percentage calculations
-      const selectedData = sortedKeys.map(key => {
-        const agg = aggregations[key];
-        if (isPercent) {
-          const avg = agg.selectedCount > 0 ? (agg.selectedSum / agg.selectedCount) : 0;
-          return needsScaling ? avg * 100 : avg;
+      // Map out individual custom dataset parameters
+      const datasets = Object.keys(seriesMap).map((sId, idx) => {
+        const spec = seriesMap[sId];
+        const mSpec = measureSpecs[spec.measureName];
+
+        const dataPoints = sortedKeys.map(key => {
+          const agg = aggregations[key][sId];
+          if (mSpec.isPercent) {
+            const avg = agg.count > 0 ? (agg.sum / agg.count) : 0;
+            return mSpec.needsScaling ? avg * 100 : avg;
+          }
+          return agg.count > 0 ? agg.sum : null; 
+        });
+
+        const chosenColor = config[`color_${sId}`] || defaultPalette[idx % defaultPalette.length];
+        const lineStyle = config[`linestyle_${sId}`] || "solid";
+        const showArea = config[`area_${sId}`] || false;
+        const pointStyleOpt = config.global_point_style || "none";
+
+        let pointRadius = 0;
+        let pointBg = chosenColor;
+        
+        if (pointStyleOpt === "filled") {
+          pointRadius = 4;
+        } else if (pointStyleOpt === "outline") {
+          pointRadius = 4;
+          pointBg = "#ffffff";
         }
-        return agg.selectedSum;
+
+        return {
+          label: config[`label_${sId}`] || spec.label,
+          data: dataPoints,
+          borderColor: chosenColor,
+          backgroundColor: showArea ? hexToRgba(chosenColor, 0.15) : "transparent",
+          fill: showArea,
+          borderWidth: 2.5,
+          borderDash: lineStyle === "dashed" ? [6, 4] : [],
+          pointRadius: pointRadius,
+          pointHoverRadius: 6,
+          pointBackgroundColor: pointBg,
+          pointBorderColor: chosenColor,
+          pointBorderWidth: pointStyleOpt === "outline" ? 2 : 1,
+          tension: 0.15,
+          isPercent: mSpec.isPercent
+        };
       });
 
-      const previousData = sortedKeys.map(key => {
-        const agg = aggregations[key];
-        if (isPercent) {
-          const avg = agg.previousCount > 0 ? (agg.previousSum / agg.previousCount) : 0;
-          return needsScaling ? avg * 100 : avg;
+      // Check if general formatting trends require a percent localized axis setup
+      const primaryIsPercent = datasets.length > 0 ? datasets[0].isPercent : false;
+
+      // Formatting axis and tooltip logic dynamically
+      const yAxisCallback = function(value) {
+        return primaryIsPercent ? value.toFixed(1) + '%' : value.toLocaleString();
+      };
+
+      const tooltipCallback = function(context) {
+        let label = context.dataset.label || '';
+        if (label) label += ': ';
+        if (context.parsed.y !== null) {
+          label += context.dataset.isPercent ? context.parsed.y.toFixed(1) + '%' : context.parsed.y.toLocaleString();
         }
-        return agg.previousSum;
-      });
+        return label;
+      };
+
+      // Inline Canvas Engine Plugin to render value labels perfectly without external plugin CDNs
+      const valueLabelsPlugin = {
+        id: "valueLabelsPlugin",
+        afterDatasetsDraw: (chart) => {
+          if (!config.global_value_labels) return;
+          const ctx = chart.ctx;
+          
+          chart.data.datasets.forEach((dataset, datasetIdx) => {
+            const meta = chart.getDatasetMeta(datasetIdx);
+            if (meta.hidden) return;
+
+            meta.data.forEach((element, index) => {
+              const val = dataset.data[index];
+              if (val === null || val === undefined) return;
+
+              const formatted = dataset.isPercent ? val.toFixed(1) + '%' : val.toLocaleString();
+              ctx.fillStyle = "#4b5563";
+              ctx.font = "600 10px Roboto, Arial, sans-serif";
+              ctx.textAlign = "center";
+              ctx.textBaseline = "bottom";
+              
+              // Shift above points neatly
+              ctx.fillText(formatted, element.x, element.y - 7);
+            });
+          });
+        }
+      };
 
       // =====================================================
-      // CHART GENERATION / UPDATE CONFIGURATION
+      // INSTANTIATION OR UPDATE ENGINE
       // =====================================================
       const ctx = element.querySelector("#popLineChart").getContext("2d");
       let animationMode = undefined; 
@@ -282,67 +466,22 @@ looker.plugins.visualizations.add({
       if (details && details.changed && !details.changed.data && !this.isFrontendToggleAction) {
         animationMode = 'none';
       }
-      
       this.isFrontendToggleAction = false;
-
-      // Formatting callbacks to clean up Y-axis labels and popover tooltips
-      const yAxisCallback = function(value) {
-        return isPercent ? value.toFixed(1) + '%' : value.toLocaleString();
-      };
-
-      const tooltipCallback = function(context) {
-        let label = context.dataset.label || '';
-        if (label) label += ': ';
-        if (context.parsed.y !== null) {
-          label += isPercent ? context.parsed.y.toFixed(1) + '%' : context.parsed.y.toLocaleString();
-        }
-        return label;
-      };
 
       if (this.chartInstance) {
         this.chartInstance.data.labels = labels;
-        
-        this.chartInstance.data.datasets[0].label = config.legend_label_selected || "Selected Period";
-        this.chartInstance.data.datasets[0].data = selectedData;
-        this.chartInstance.data.datasets[0].borderColor = config.line_color_selected || "#1ad1ff";
-        
-        this.chartInstance.data.datasets[1].label = config.legend_label_previous || "Comparison Period";
-        this.chartInstance.data.datasets[1].data = previousData;
-        this.chartInstance.data.datasets[1].borderColor = config.line_color_previous || "#0f2d5c";
-        
-        // Push dynamic changes into config instances safely
+        this.chartInstance.data.datasets = datasets;
         this.chartInstance.options.scales.y.ticks.callback = yAxisCallback;
         this.chartInstance.options.plugins.tooltip.callbacks.label = tooltipCallback;
-
         this.chartInstance.update(animationMode);
       } else {
         this.chartInstance = new Chart(ctx, {
           type: "line",
           data: {
             labels: labels,
-            datasets: [
-              {
-                label: config.legend_label_selected || "Selected Period",
-                data: selectedData,
-                borderColor: config.line_color_selected || "#1ad1ff",
-                backgroundColor: "transparent",
-                borderWidth: 2.5,
-                pointRadius: 0,
-                pointHoverRadius: 5,
-                tension: 0.15
-              },
-              {
-                label: config.legend_label_previous || "Comparison Period",
-                data: previousData,
-                borderColor: config.line_color_previous || "#0f2d5c",
-                backgroundColor: "transparent",
-                borderWidth: 2.5,
-                pointRadius: 0,
-                pointHoverRadius: 5,
-                tension: 0.15
-              }
-            ]
+            datasets: datasets
           },
+          plugins: [valueLabelsPlugin],
           options: {
             responsive: true,
             maintainAspectRatio: false,
