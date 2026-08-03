@@ -501,7 +501,10 @@ looker.plugins.visualizations.add({
             grid: { display: false }, 
             ticks: {
               color: "#6b7280",
-              font: { size: 11 }
+              font: { size: 11 },
+              minRotation: 0,  // Forces horizontal alignment
+              maxRotation: 0,  // Forces horizontal alignment
+              autoSkip: true   // Skips labels cleanly if there isn't enough space
             }
           },
           y: {
