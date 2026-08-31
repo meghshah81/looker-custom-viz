@@ -29,6 +29,17 @@ looker.plugins.visualizations.add({
           box-sizing: border-box;
           padding: 8px;
         }
+        .limit-warning {
+          display: none;
+          background: #fff3cd;
+          color: #664d03;
+          padding: 6px 12px;
+          font-size: 12px;
+          border: 1px solid #ffecb5;
+          border-radius: 4px;
+          margin-bottom: 8px;
+          flex-shrink: 0;
+        }
         .controls-bar {
           margin-bottom: 12px;
           display: flex;
@@ -97,6 +108,7 @@ looker.plugins.visualizations.add({
         }
       </style>
       <div class="custom-vis-container">
+        <div id="row-limit-warning" class="limit-warning"></div>
         <div class="controls-bar">
           <span class="controls-title">Dimensions:</span>
           <div class="dim-select-container" id="dim-select-container"></div>
@@ -110,10 +122,27 @@ looker.plugins.visualizations.add({
       </div>
     `;
     this._selectedDims = null;
+    this._requestedLimit = false;
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this.clearErrors();
+
+    // Programmatically trigger 50,000 row query limit from Looker backend
+    if (queryResponse && queryResponse.row_limit < 50000 && !this._requestedLimit) {
+      this._requestedLimit = true;
+      this.trigger('limit', [50000]);
+      return;
+    }
+
+    // Display warning banner if the 50,000 row cap is reached
+    const warningEl = element.querySelector('#row-limit-warning');
+    if (queryResponse && queryResponse.has_reached_row_limit) {
+      warningEl.style.display = 'block';
+      warningEl.innerText = `⚠️ Visualization row limit (${(queryResponse.row_limit || 50000).toLocaleString()} rows) reached. Aggregated numbers may be based on partial data.`;
+    } else {
+      warningEl.style.display = 'none';
+    }
 
     const dimFields = queryResponse.fields.dimension_like || [];
     const measureFields = queryResponse.fields.measure_like || [];
