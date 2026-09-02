@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_dimension_table",
-  label: "Dynamic Aggregation Table",
+  id: "dynamic_tree_aggregation_table",
+  label: "Dynamic Tree Aggregation Table",
   options: {
     font_size: {
       type: "number",
@@ -11,7 +11,14 @@ looker.plugins.visualizations.add({
     header_bg_color: {
       type: "string",
       label: "Header Background",
-      default: "#f1f3f5",
+      default: "#003366",
+      display: "color",
+      section: "Style"
+    },
+    header_text_color: {
+      type: "string",
+      label: "Header Text Color",
+      default: "#ffffff",
       display: "color",
       section: "Style"
     }
@@ -44,35 +51,34 @@ looker.plugins.visualizations.add({
           margin-bottom: 12px;
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 16px;
           background: #f8f9fa;
           padding: 8px 12px;
           border-radius: 6px;
           border: 1px solid #e0e0e0;
           flex-shrink: 0;
-        }
-        .controls-title {
-          font-weight: 600;
-          font-size: 13px;
-          color: #333;
-        }
-        .dim-select-container {
-          display: flex;
-          gap: 12px;
           flex-wrap: wrap;
         }
-        .checkbox-label {
+        .control-group {
           display: flex;
           align-items: center;
           gap: 6px;
-          font-size: 13px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #333;
+        }
+        .control-group select {
+          padding: 4px 8px;
+          font-size: 12px;
+          border-radius: 4px;
+          border: 1px solid #ccc;
+          background: #fff;
           cursor: pointer;
-          user-select: none;
         }
         .table-wrapper {
           flex: 1;
           overflow: auto;
-          border: 1px solid #e0e0e0;
+          border: 1px solid #d0d7de;
           border-radius: 4px;
         }
         .custom-table {
@@ -81,65 +87,88 @@ looker.plugins.visualizations.add({
           font-size: 13px;
         }
         .custom-table th {
-          background-color: #f1f3f5;
-          color: #495057;
           text-align: left;
-          padding: 10px 12px;
+          padding: 8px 12px;
           font-weight: 600;
-          border-bottom: 2px solid #dee2e6;
+          border: 1px solid #c8d1dc;
           position: sticky;
           top: 0;
-          z-index: 1;
+          z-index: 2;
         }
         .custom-table td {
-          padding: 8px 12px;
-          border-bottom: 1px solid #e9ecef;
+          padding: 6px 12px;
+          border: 1px solid #e1e4e8;
           color: #212529;
         }
+        .custom-table tr:nth-child(even) {
+          background-color: #f6f8fa;
+        }
         .custom-table tr:hover {
-          background-color: #f8f9fa;
+          background-color: #eaf2ff;
         }
         .text-right {
           text-align: right;
         }
-        .null-val {
-          color: #adb5bd;
-          font-style: italic;
+        .tree-node-cell {
+          display: flex;
+          align-items: center;
+          cursor: pointer;
+          user-select: none;
+        }
+        .toggle-icon {
+          display: inline-block;
+          width: 16px;
+          font-size: 10px;
+          color: #333;
+          font-weight: bold;
+          margin-right: 4px;
+        }
+        .node-label {
+          flex-grow: 1;
+        }
+        .child-count {
+          color: #333;
+          margin-left: 6px;
+          font-weight: normal;
+        }
+        .totals-row td {
+          font-weight: bold;
+          background-color: #ffffff;
+          border-top: 2px solid #a0a0a0;
         }
       </style>
       <div class="custom-vis-container">
         <div id="row-limit-warning" class="limit-warning"></div>
-        <div class="controls-bar">
-          <span class="controls-title">Dimensions:</span>
-          <div class="dim-select-container" id="dim-select-container"></div>
-        </div>
+        <div class="controls-bar" id="controls-bar"></div>
         <div class="table-wrapper">
           <table class="custom-table">
             <thead id="table-head"></thead>
             <tbody id="table-body"></tbody>
+            <tfoot id="table-foot"></tfoot>
           </table>
         </div>
       </div>
     `;
-    this._selectedDims = null;
+
+    this._expandedKeys = new Set();
+    this._selectedDims = [null, null, null];
+    this._selectedMeasures = [null];
     this._requestedLimit = false;
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this.clearErrors();
 
-    // Programmatically trigger 50,000 row query limit from Looker backend
     if (queryResponse && queryResponse.row_limit < 50000 && !this._requestedLimit) {
       this._requestedLimit = true;
       this.trigger('limit', [50000]);
       return;
     }
 
-    // Display warning banner if the 50,000 row cap is reached
     const warningEl = element.querySelector('#row-limit-warning');
     if (queryResponse && queryResponse.has_reached_row_limit) {
       warningEl.style.display = 'block';
-      warningEl.innerText = `⚠️ Visualization row limit (${(queryResponse.row_limit || 50000).toLocaleString()} rows) reached. Aggregated numbers may be based on partial data.`;
+      warningEl.innerText = `⚠️ Row limit reached (${(queryResponse.row_limit || 50000).toLocaleString()} rows). Data aggregated from returned rows.`;
     } else {
       warningEl.style.display = 'none';
     }
@@ -150,112 +179,257 @@ looker.plugins.visualizations.add({
     if (dimFields.length === 0 || measureFields.length === 0) {
       this.addError({
         title: "Missing Fields",
-        message: "Requires at least 1 dimension and 1 measure to aggregate."
+        message: "Requires at least 1 dimension and 1 measure."
       });
       done();
       return;
     }
 
-    if (!this._selectedDims || !this._selectedDims.every(id => dimFields.some(d => d.name === id))) {
-      this._selectedDims = dimFields.map(d => d.name);
+    // Initialize defaults if selections are empty or invalid
+    if (!this._selectedDims[0] || !dimFields.some(d => d.name === this._selectedDims[0])) {
+      this._selectedDims[0] = dimFields[0] ? dimFields[0].name : null;
+      this._selectedDims[1] = dimFields[1] ? dimFields[1].name : "none";
+      this._selectedDims[2] = dimFields[2] ? dimFields[2].name : "none";
     }
 
-    const container = element.querySelector('#dim-select-container');
-    container.innerHTML = '';
+    if (!this._selectedMeasures[0] || !measureFields.some(m => m.name === this._selectedMeasures[0])) {
+      this._selectedMeasures[0] = measureFields[0] ? measureFields[0].name : null;
+      this._selectedMeasures[1] = measureFields[1] ? measureFields[1].name : "none";
+      this._selectedMeasures[2] = measureFields[2] ? measureFields[2].name : "none";
+    }
 
-    dimFields.forEach(dim => {
-      const label = document.createElement('label');
-      label.className = 'checkbox-label';
+    this.renderControls(dimFields, measureFields, data, config, element);
+    this.processAndRenderData(data, dimFields, measureFields, config, element);
 
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.value = dim.name;
-      checkbox.checked = this._selectedDims.includes(dim.name);
-
-      checkbox.addEventListener('change', () => {
-        const checked = Array.from(container.querySelectorAll('input[type="checkbox"]:checked'))
-          .map(cb => cb.value);
-
-        if (checked.length === 0) {
-          checkbox.checked = true;
-          return;
-        }
-
-        this._selectedDims = checked;
-        this.renderTable(data, dimFields, measureFields, config);
-      });
-
-      label.appendChild(checkbox);
-      label.appendChild(document.createTextNode(dim.label_short || dim.label));
-      container.appendChild(label);
-    });
-
-    this.renderTable(data, dimFields, measureFields, config);
     done();
   },
 
-  renderTable: function(data, dimFields, measureFields, config) {
-    const activeDimFields = dimFields.filter(d => this._selectedDims.includes(d.name));
-    const measureField = measureFields[0];
-    const fontSize = config.font_size || 13;
-    const headerBg = config.header_bg_color || "#f1f3f5";
+  renderControls: function(dimFields, measureFields, data, config, element) {
+    const controlsContainer = element.querySelector('#controls-bar');
+    controlsContainer.innerHTML = '';
 
-    const aggregatedMap = new Map();
+    const createSelect = (label, optionsList, currentValue, onChange, allowNone = false) => {
+      const group = document.createElement('div');
+      group.className = 'control-group';
+
+      const lbl = document.createElement('label');
+      lbl.innerText = label;
+      group.appendChild(lbl);
+
+      const select = document.createElement('select');
+
+      if (allowNone) {
+        const optNone = document.createElement('option');
+        optNone.value = 'none';
+        optNone.innerText = '-- None --';
+        select.appendChild(optNone);
+      }
+
+      optionsList.forEach(field => {
+        const opt = document.createElement('option');
+        opt.value = field.name;
+        opt.innerText = field.label_short || field.label;
+        select.appendChild(opt);
+      });
+
+      select.value = currentValue || (allowNone ? 'none' : optionsList[0]?.name);
+      select.addEventListener('change', (e) => onChange(e.target.value));
+
+      group.appendChild(select);
+      return group;
+    };
+
+    // Dimension selectors
+    controlsContainer.appendChild(createSelect("Dim 1:", dimFields, this._selectedDims[0], (val) => {
+      this._selectedDims[0] = val;
+      this.processAndRenderData(data, dimFields, measureFields, config, element);
+    }, false));
+
+    controlsContainer.appendChild(createSelect("Dim 2:", dimFields, this._selectedDims[1], (val) => {
+      this._selectedDims[1] = val;
+      this.processAndRenderData(data, dimFields, measureFields, config, element);
+    }, true));
+
+    controlsContainer.appendChild(createSelect("Dim 3:", dimFields, this._selectedDims[2], (val) => {
+      this._selectedDims[2] = val;
+      this.processAndRenderData(data, dimFields, measureFields, config, element);
+    }, true));
+
+    // Divider
+    const sep = document.createElement('span');
+    sep.style.color = '#ccc';
+    sep.innerText = '|';
+    controlsContainer.appendChild(sep);
+
+    // Measure selectors
+    controlsContainer.appendChild(createSelect("Measure 1:", measureFields, this._selectedMeasures[0], (val) => {
+      this._selectedMeasures[0] = val;
+      this.processAndRenderData(data, dimFields, measureFields, config, element);
+    }, false));
+
+    controlsContainer.appendChild(createSelect("Measure 2:", measureFields, this._selectedMeasures[1], (val) => {
+      this._selectedMeasures[1] = val;
+      this.processAndRenderData(data, dimFields, measureFields, config, element);
+    }, true));
+
+    controlsContainer.appendChild(createSelect("Measure 3:", measureFields, this._selectedMeasures[2], (val) => {
+      this._selectedMeasures[2] = val;
+      this.processAndRenderData(data, dimFields, measureFields, config, element);
+    }, true));
+  },
+
+  processAndRenderData: function(data, dimFields, measureFields, config, element) {
+    const activeDims = this._selectedDims
+      .filter(d => d && d !== 'none')
+      .map(id => dimFields.find(f => f.name === id))
+      .filter(Boolean);
+
+    const activeMeasures = this._selectedMeasures
+      .filter(m => m && m !== 'none')
+      .map(id => measureFields.find(f => f.name === id))
+      .filter(Boolean);
+
+    // Build hierarchical tree structure
+    const rootNodes = new Map();
+    const grandTotals = new Array(activeMeasures.length).fill(0);
 
     data.forEach(row => {
-      const keyParts = activeDimFields.map(d => {
-        const cell = row[d.name];
-        return (cell && cell.value !== null && cell.value !== undefined && cell.value !== "") 
-          ? String(cell.value) 
-          : "∅";
+      let currentMap = rootNodes;
+      let currentPath = "";
+
+      // Gather measure values for row
+      const rowMeasures = activeMeasures.map(m => {
+        const val = row[m.name] ? Number(row[m.name].value) : 0;
+        return isNaN(val) ? 0 : val;
       });
-      const groupKey = keyParts.join("|||");
 
-      const measureVal = row[measureField.name] ? Number(row[measureField.name].value) || 0 : 0;
+      rowMeasures.forEach((val, idx) => { grandTotals[idx] += val; });
 
-      if (!aggregatedMap.has(groupKey)) {
-        aggregatedMap.set(groupKey, {
-          dimValues: keyParts,
-          total: measureVal
-        });
-      } else {
-        aggregatedMap.get(groupKey).total += measureVal;
-      }
-    });
+      activeDims.forEach((dimField, level) => {
+        const cell = row[dimField.name];
+        const rawVal = (cell && cell.value !== null && cell.value !== undefined && cell.value !== "")
+          ? String(cell.value)
+          : "∅";
 
-    const aggregatedData = Array.from(aggregatedMap.values()).sort((a, b) => {
-      for (let i = 0; i < a.dimValues.length; i++) {
-        const valA = a.dimValues[i];
-        const valB = b.dimValues[i];
+        currentPath = currentPath ? `${currentPath}|||${rawVal}` : rawVal;
 
-        if (valA !== valB) {
-          return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+        if (!currentMap.has(rawVal)) {
+          currentMap.set(rawVal, {
+            key: rawVal,
+            path: currentPath,
+            level: level,
+            children: new Map(),
+            totals: new Array(activeMeasures.length).fill(0)
+          });
         }
-      }
-      return 0;
+
+        const node = currentMap.get(rawVal);
+        rowMeasures.forEach((val, idx) => { node.totals[idx] += val; });
+
+        currentMap = node.children;
+      });
     });
 
-    const headEl = document.getElementById('table-head');
+    this.renderTableTree(rootNodes, grandTotals, activeDims, activeMeasures, config, element, data, dimFields, measureFields);
+  },
+
+  renderTableTree: function(rootNodes, grandTotals, activeDims, activeMeasures, config, element, data, dimFields, measureFields) {
+    const fontSize = config.font_size || 13;
+    const headerBg = config.header_bg_color || "#003366";
+    const headerText = config.header_text_color || "#ffffff";
+
+    // 1. Render Table Header
+    const headEl = element.querySelector('#table-head');
     let headHtml = `<tr style="font-size: ${fontSize}px;">`;
-    activeDimFields.forEach(dim => {
-      headHtml += `<th style="background-color: ${headerBg};">${dim.label_short || dim.label}</th>`;
+    headHtml += `<th style="background-color: ${headerBg}; color: ${headerText};">Group</th>`;
+
+    activeMeasures.forEach(m => {
+      headHtml += `<th class="text-right" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
     });
-    headHtml += `<th class="text-right" style="background-color: ${headerBg};">${measureField.label_short || measureField.label}</th></tr>`;
+    headHtml += `</tr>`;
     headEl.innerHTML = headHtml;
 
-    const bodyEl = document.getElementById('table-body');
-    let bodyHtml = '';
+    // 2. Render Table Body (Hierarchical expansion)
+    const bodyEl = element.querySelector('#table-body');
+    bodyEl.innerHTML = '';
 
-    aggregatedData.forEach(item => {
-      bodyHtml += `<tr style="font-size: ${fontSize}px;">`;
-      item.dimValues.forEach(val => {
-        const displayVal = val === "∅" ? '<span class="null-val">∅</span>' : val;
-        bodyHtml += `<td>${displayVal}</td>`;
+    const renderNodeList = (nodesMap) => {
+      const sortedNodes = Array.from(nodesMap.values()).sort((a, b) =>
+        a.key.localeCompare(b.key, undefined, { numeric: true, sensitivity: 'base' })
+      );
+
+      sortedNodes.forEach(node => {
+        const hasChildren = node.children.size > 0;
+        const isExpanded = this._expandedKeys.has(node.path);
+        const indentPx = node.level * 24 + 12;
+
+        const tr = document.createElement('tr');
+        tr.style.fontSize = `${fontSize}px`;
+
+        // Group cell
+        const groupTd = document.createElement('td');
+        const flexDiv = document.createElement('div');
+        flexDiv.className = 'tree-node-cell';
+        flexDiv.style.paddingLeft = `${indentPx}px`;
+
+        const toggleSpan = document.createElement('span');
+        toggleSpan.className = 'toggle-icon';
+        toggleSpan.innerText = hasChildren ? (isExpanded ? '▼' : '▶') : '';
+
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'node-label';
+        labelSpan.innerText = node.key;
+
+        flexDiv.appendChild(toggleSpan);
+        flexDiv.appendChild(labelSpan);
+
+        if (hasChildren) {
+          const countSpan = document.createElement('span');
+          countSpan.className = 'child-count';
+          countSpan.innerText = `(${node.children.size})`;
+          flexDiv.appendChild(countSpan);
+
+          flexDiv.addEventListener('click', () => {
+            if (this._expandedKeys.has(node.path)) {
+              this._expandedKeys.delete(node.path);
+            } else {
+              this._expandedKeys.add(node.path);
+            }
+            this.processAndRenderData(data, dimFields, measureFields, config, element);
+          });
+        }
+
+        groupTd.appendChild(flexDiv);
+        tr.appendChild(groupTd);
+
+        // Measure cells
+        node.totals.forEach(tot => {
+          const mTd = document.createElement('td');
+          mTd.className = 'text-right';
+          mTd.innerText = tot.toLocaleString();
+          tr.appendChild(mTd);
+        });
+
+        bodyEl.appendChild(tr);
+
+        // Render sub-level if expanded
+        if (hasChildren && isExpanded) {
+          renderNodeList(node.children);
+        }
       });
-      bodyHtml += `<td class="text-right">${item.total.toLocaleString()}</td>`;
-      bodyHtml += '</tr>';
-    });
+    };
 
-    bodyEl.innerHTML = bodyHtml;
+    renderNodeList(rootNodes);
+
+    // 3. Render Totals Footer
+    const footEl = element.querySelector('#table-foot');
+    let footHtml = `<tr class="totals-row" style="font-size: ${fontSize}px;">`;
+    footHtml += `<td>Totals</td>`;
+
+    grandTotals.forEach(tot => {
+      footHtml += `<td class="text-right">${tot.toLocaleString()}</td>`;
+    });
+    footHtml += `</tr>`;
+    footEl.innerHTML = footHtml;
   }
 });
