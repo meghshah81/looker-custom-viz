@@ -332,25 +332,10 @@ looker.plugins.visualizations.add({
     const headerBg = config.header_bg_color || "#003366";
     const headerText = config.header_text_color || "#ffffff";
 
-    // Build dynamic header title based on selected active dimensions
-    const groupHeaderLabel = activeDims.length > 0
-      ? activeDims.map(d => d.label_short || d.label).join(' → ')
-      : 'Group';
-
-    // 1. Render Table Header
-    const headEl = element.querySelector('#table-head');
-    let headHtml = `<tr style="font-size: ${fontSize}px;">`;
-    headHtml += `<th style="background-color: ${headerBg}; color: ${headerText};">${groupHeaderLabel}</th>`;
-
-    activeMeasures.forEach(m => {
-      headHtml += `<th class="text-right" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
-    });
-    headHtml += `</tr>`;
-    headEl.innerHTML = headHtml;
-
-    // 2. Render Table Body
     const bodyEl = element.querySelector('#table-body');
     bodyEl.innerHTML = '';
+
+    let maxRenderedLevel = 0;
 
     const renderNodeList = (nodesMap) => {
       const sortedNodes = Array.from(nodesMap.values()).sort((a, b) =>
@@ -358,6 +343,10 @@ looker.plugins.visualizations.add({
       );
 
       sortedNodes.forEach(node => {
+        if (node.level > maxRenderedLevel) {
+          maxRenderedLevel = node.level;
+        }
+
         const hasChildren = node.children.size > 0;
         const isExpanded = this._expandedKeys.has(node.path);
         const indentPx = node.level * 24 + 12;
@@ -417,7 +406,24 @@ looker.plugins.visualizations.add({
 
     renderNodeList(rootNodes);
 
-    // 3. Render Totals Footer
+    // Dynamic header label based on max rendered nesting level
+    const visibleDims = activeDims.slice(0, maxRenderedLevel + 1);
+    const groupHeaderLabel = visibleDims.length > 0
+      ? visibleDims.map(d => d.label_short || d.label).join(' → ')
+      : 'Group';
+
+    // 1. Render Table Header
+    const headEl = element.querySelector('#table-head');
+    let headHtml = `<tr style="font-size: ${fontSize}px;">`;
+    headHtml += `<th style="background-color: ${headerBg}; color: ${headerText};">${groupHeaderLabel}</th>`;
+
+    activeMeasures.forEach(m => {
+      headHtml += `<th class="text-right" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
+    });
+    headHtml += `</tr>`;
+    headEl.innerHTML = headHtml;
+
+    // 2. Render Totals Footer
     const footEl = element.querySelector('#table-foot');
     let footHtml = `<tr class="totals-row" style="font-size: ${fontSize}px;">`;
     footHtml += `<td>Totals</td>`;
