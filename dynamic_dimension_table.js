@@ -136,6 +136,40 @@ looker.plugins.visualizations.add({
           background-color: #ffffff;
           border-top: 2px solid #a0a0a0;
         }
+
+        /* Pill Badge Styling for Table Header Breadcrumb */
+        .hdr-breadcrumb-container {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 6px;
+        }
+        .hdr-pill {
+          display: inline-flex;
+          align-items: center;
+          padding: 3px 10px;
+          border-radius: 12px;
+          font-size: 11px;
+          font-weight: 500;
+          background: rgba(255, 255, 255, 0.18);
+          color: rgba(255, 255, 255, 0.9);
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          white-space: nowrap;
+          letter-spacing: 0.2px;
+        }
+        .hdr-pill.current-active {
+          background: #ffffff;
+          color: #003366;
+          font-weight: 700;
+          border-color: #ffffff;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+        }
+        .hdr-arrow {
+          font-size: 12px;
+          color: rgba(255, 255, 255, 0.6);
+          user-select: none;
+          font-weight: bold;
+        }
       </style>
       <div class="custom-vis-container">
         <div id="row-limit-warning" class="limit-warning"></div>
@@ -406,16 +440,31 @@ looker.plugins.visualizations.add({
 
     renderNodeList(rootNodes);
 
-    // Dynamic header label based on max rendered nesting level
+    // Build Pill Badge Header HTML
     const visibleDims = activeDims.slice(0, maxRenderedLevel + 1);
-    const groupHeaderLabel = visibleDims.length > 0
-      ? visibleDims.map(d => d.label_short || d.label).join(' → ')
-      : 'Group';
+    let groupHeaderHtml = '';
+
+    if (visibleDims.length > 0) {
+      groupHeaderHtml = '<div class="hdr-breadcrumb-container">';
+      visibleDims.forEach((d, idx) => {
+        const isLatest = idx === visibleDims.length - 1;
+        const labelText = d.label_short || d.label;
+        const pillClass = isLatest ? 'hdr-pill current-active' : 'hdr-pill';
+        
+        groupHeaderHtml += `<span class="${pillClass}">${labelText}</span>`;
+        if (!isLatest) {
+          groupHeaderHtml += `<span class="hdr-arrow">›</span>`;
+        }
+      });
+      groupHeaderHtml += '</div>';
+    } else {
+      groupHeaderHtml = 'Group';
+    }
 
     // 1. Render Table Header
     const headEl = element.querySelector('#table-head');
     let headHtml = `<tr style="font-size: ${fontSize}px;">`;
-    headHtml += `<th style="background-color: ${headerBg}; color: ${headerText};">${groupHeaderLabel}</th>`;
+    headHtml += `<th style="background-color: ${headerBg}; color: ${headerText};">${groupHeaderHtml}</th>`;
 
     activeMeasures.forEach(m => {
       headHtml += `<th class="text-right" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
