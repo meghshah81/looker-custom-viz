@@ -137,7 +137,6 @@ looker.plugins.visualizations.add({
           border-top: 2px solid #a0a0a0;
         }
 
-        /* Pill Badge Styling for Table Header Breadcrumb */
         .hdr-breadcrumb-container {
           display: flex;
           align-items: center;
@@ -193,6 +192,7 @@ looker.plugins.visualizations.add({
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this.clearErrors();
 
+    // Force Looker backend query limit to max 50,000 rows
     if (queryResponse && queryResponse.row_limit < 50000 && !this._requestedLimit) {
       this._requestedLimit = true;
       this.trigger('limit', [50000]);
@@ -202,7 +202,7 @@ looker.plugins.visualizations.add({
     const warningEl = element.querySelector('#row-limit-warning');
     if (queryResponse && queryResponse.has_reached_row_limit) {
       warningEl.style.display = 'block';
-      warningEl.innerText = `⚠️ Row limit reached (${(queryResponse.row_limit || 50000).toLocaleString()} rows). Data aggregated from returned rows.`;
+      warningEl.innerText = `⚠️ Visualization row limit (${(queryResponse.row_limit || 50000).toLocaleString()} rows) reached. Sub-aggregations are based on retrieved dataset.`;
     } else {
       warningEl.style.display = 'none';
     }
@@ -232,7 +232,7 @@ looker.plugins.visualizations.add({
     }
 
     this.renderControls(dimFields, measureFields, data, config, element);
-    this.processAndRenderData(data, dimFields, measureFields, config, element);
+    this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
 
     done();
   },
@@ -308,7 +308,7 @@ looker.plugins.visualizations.add({
     }, true));
   },
 
-  processAndRenderData: function(data, dimFields, measureFields, config, element) {
+  processAndRenderData: function(data, dimFields, measureFields, config, element, queryResponse) {
     const activeDims = this._selectedDims
       .filter(d => d && d !== 'none')
       .map(id => dimFields.find(f => f.name === id))
@@ -319,24 +319,41 @@ looker.plugins.visualizations.add({
       .map(id => measureFields.find(f => f.name === id))
       .filter(Boolean);
 
+    // Detect if measure fields are percentage/rate metrics
+    const measureMeta = activeMeasures.map(m => {
+      const sampleCell = data[0] && data[0][m.name];
+      const isPercent = (sampleCell && sampleCell.rendered && sampleCell.rendered.includes('%')) ||
+                        (m.value_format && m.value_format.includes('%')) ||
+                        (m.type && m.type.includes('percent'));
+      return { field: m, isPercent: isPercent };
+    });
+
     const rootNodes = new Map();
-    const grandTotals = new Array(activeMeasures.length).fill(0);
+    const sumTotals = new Array(activeMeasures.length).fill(0);
+    const countTotals = new Array(activeMeasures.length).fill(0);
 
     data.forEach(row => {
       let currentMap = rootNodes;
       let currentPath = "";
 
       const rowMeasures = activeMeasures.map(m => {
-        const val = row[m.name] ? Number(row[m.name].value) : 0;
-        return isNaN(val) ? 0 : val;
+        const cell = row[m.name];
+        const val = cell ? Number(cell.value) : 0;
+        return {
+          num: isNaN(val) ? 0 : val,
+          rendered: cell ? cell.rendered : null
+        };
       });
 
-      rowMeasures.forEach((val, idx) => { grandTotals[idx] += val; });
+      rowMeasures.forEach((mObj, idx) => {
+        sumTotals[idx] += mObj.num;
+        countTotals[idx] += 1;
+      });
 
       activeDims.forEach((dimField, level) => {
         const cell = row[dimField.name];
         const rawVal = (cell && cell.value !== null && cell.value !== undefined && cell.value !== "")
-          ? String(cell.value)
+          ? String(cell.rendered || cell.value)
           : "∅";
 
         currentPath = currentPath ? `${currentPath}|||${rawVal}` : rawVal;
@@ -347,21 +364,48 @@ looker.plugins.visualizations.add({
             path: currentPath,
             level: level,
             children: new Map(),
-            totals: new Array(activeMeasures.length).fill(0)
+            sums: new Array(activeMeasures.length).fill(0),
+            counts: new Array(activeMeasures.length).fill(0),
+            leafRendered: new Array(activeMeasures.length).fill(null)
           });
         }
 
         const node = currentMap.get(rawVal);
-        rowMeasures.forEach((val, idx) => { node.totals[idx] += val; });
+        rowMeasures.forEach((mObj, idx) => {
+          node.sums[idx] += mObj.num;
+          node.counts[idx] += 1;
+          if (mObj.rendered) {
+            node.leafRendered[idx] = mObj.rendered;
+          }
+        });
 
         currentMap = node.children;
       });
     });
 
-    this.renderTableTree(rootNodes, grandTotals, activeDims, activeMeasures, config, element, data, dimFields, measureFields);
+    // Determine Grand Totals: Preference given to Looker Native Backend totals_data
+    const grandTotals = activeMeasures.map((m, idx) => {
+      if (queryResponse && queryResponse.totals_data && queryResponse.totals_data[m.name]) {
+        const tCell = queryResponse.totals_data[m.name];
+        return tCell.rendered || (measureMeta[idx].isPercent 
+          ? (Number(tCell.value) * (tCell.value <= 1 ? 100 : 1)).toFixed(1) + '%'
+          : Number(tCell.value).toLocaleString());
+      }
+
+      // Client-side fallback aggregation
+      if (measureMeta[idx].isPercent) {
+        const avg = countTotals[idx] > 0 ? sumTotals[idx] / countTotals[idx] : 0;
+        const displayVal = avg <= 1 && avg >= -1 ? avg * 100 : avg;
+        return displayVal.toFixed(1) + '%';
+      } else {
+        return sumTotals[idx].toLocaleString();
+      }
+    });
+
+    this.renderTableTree(rootNodes, grandTotals, activeDims, activeMeasures, measureMeta, config, element);
   },
 
-  renderTableTree: function(rootNodes, grandTotals, activeDims, activeMeasures, config, element, data, dimFields, measureFields) {
+  renderTableTree: function(rootNodes, grandTotals, activeDims, activeMeasures, measureMeta, config, element) {
     const fontSize = config.font_size || 13;
     const headerBg = config.header_bg_color || "#003366";
     const headerText = config.header_text_color || "#ffffff";
@@ -370,6 +414,23 @@ looker.plugins.visualizations.add({
     bodyEl.innerHTML = '';
 
     let maxRenderedLevel = 0;
+
+    const formatNodeValue = (node, idx) => {
+      const isPercent = measureMeta[idx].isPercent;
+
+      // Leaf node display: use direct rendered string from Looker
+      if (node.children.size === 0 && node.leafRendered[idx]) {
+        return node.leafRendered[idx];
+      }
+
+      if (isPercent) {
+        const avg = node.counts[idx] > 0 ? node.sums[idx] / node.counts[idx] : 0;
+        const displayVal = avg <= 1 && avg >= -1 ? avg * 100 : avg;
+        return displayVal.toFixed(1) + '%';
+      } else {
+        return node.sums[idx].toLocaleString();
+      }
+    };
 
     const renderNodeList = (nodesMap) => {
       const sortedNodes = Array.from(nodesMap.values()).sort((a, b) =>
@@ -416,17 +477,17 @@ looker.plugins.visualizations.add({
             } else {
               this._expandedKeys.add(node.path);
             }
-            this.processAndRenderData(data, dimFields, measureFields, config, element);
+            this.renderTableTree(rootNodes, grandTotals, activeDims, activeMeasures, measureMeta, config, element);
           });
         }
 
         groupTd.appendChild(flexDiv);
         tr.appendChild(groupTd);
 
-        node.totals.forEach(tot => {
+        activeMeasures.forEach((_, idx) => {
           const mTd = document.createElement('td');
           mTd.className = 'text-right';
-          mTd.innerText = tot.toLocaleString();
+          mTd.innerText = formatNodeValue(node, idx);
           tr.appendChild(mTd);
         });
 
@@ -450,7 +511,7 @@ looker.plugins.visualizations.add({
         const isLatest = idx === visibleDims.length - 1;
         const labelText = d.label_short || d.label;
         const pillClass = isLatest ? 'hdr-pill current-active' : 'hdr-pill';
-        
+
         groupHeaderHtml += `<span class="${pillClass}">${labelText}</span>`;
         if (!isLatest) {
           groupHeaderHtml += `<span class="hdr-arrow">›</span>`;
@@ -478,7 +539,7 @@ looker.plugins.visualizations.add({
     footHtml += `<td>Totals</td>`;
 
     grandTotals.forEach(tot => {
-      footHtml += `<td class="text-right">${tot.toLocaleString()}</td>`;
+      footHtml += `<td class="text-right">${tot}</td>`;
     });
     footHtml += `</tr>`;
     footEl.innerHTML = footHtml;
