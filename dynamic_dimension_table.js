@@ -185,7 +185,6 @@ looker.plugins.visualizations.add({
       return;
     }
 
-    // Initialize defaults if selections are empty or invalid
     if (!this._selectedDims[0] || !dimFields.some(d => d.name === this._selectedDims[0])) {
       this._selectedDims[0] = dimFields[0] ? dimFields[0].name : null;
       this._selectedDims[1] = dimFields[1] ? dimFields[1].name : "none";
@@ -239,7 +238,6 @@ looker.plugins.visualizations.add({
       return group;
     };
 
-    // Dimension selectors
     controlsContainer.appendChild(createSelect("Dim 1:", dimFields, this._selectedDims[0], (val) => {
       this._selectedDims[0] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element);
@@ -255,13 +253,11 @@ looker.plugins.visualizations.add({
       this.processAndRenderData(data, dimFields, measureFields, config, element);
     }, true));
 
-    // Divider
     const sep = document.createElement('span');
     sep.style.color = '#ccc';
     sep.innerText = '|';
     controlsContainer.appendChild(sep);
 
-    // Measure selectors
     controlsContainer.appendChild(createSelect("Measure 1:", measureFields, this._selectedMeasures[0], (val) => {
       this._selectedMeasures[0] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element);
@@ -289,7 +285,6 @@ looker.plugins.visualizations.add({
       .map(id => measureFields.find(f => f.name === id))
       .filter(Boolean);
 
-    // Build hierarchical tree structure
     const rootNodes = new Map();
     const grandTotals = new Array(activeMeasures.length).fill(0);
 
@@ -297,7 +292,6 @@ looker.plugins.visualizations.add({
       let currentMap = rootNodes;
       let currentPath = "";
 
-      // Gather measure values for row
       const rowMeasures = activeMeasures.map(m => {
         const val = row[m.name] ? Number(row[m.name].value) : 0;
         return isNaN(val) ? 0 : val;
@@ -338,10 +332,15 @@ looker.plugins.visualizations.add({
     const headerBg = config.header_bg_color || "#003366";
     const headerText = config.header_text_color || "#ffffff";
 
+    // Build dynamic header title based on selected active dimensions
+    const groupHeaderLabel = activeDims.length > 0
+      ? activeDims.map(d => d.label_short || d.label).join(' → ')
+      : 'Group';
+
     // 1. Render Table Header
     const headEl = element.querySelector('#table-head');
     let headHtml = `<tr style="font-size: ${fontSize}px;">`;
-    headHtml += `<th style="background-color: ${headerBg}; color: ${headerText};">Group</th>`;
+    headHtml += `<th style="background-color: ${headerBg}; color: ${headerText};">${groupHeaderLabel}</th>`;
 
     activeMeasures.forEach(m => {
       headHtml += `<th class="text-right" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
@@ -349,7 +348,7 @@ looker.plugins.visualizations.add({
     headHtml += `</tr>`;
     headEl.innerHTML = headHtml;
 
-    // 2. Render Table Body (Hierarchical expansion)
+    // 2. Render Table Body
     const bodyEl = element.querySelector('#table-body');
     bodyEl.innerHTML = '';
 
@@ -366,7 +365,6 @@ looker.plugins.visualizations.add({
         const tr = document.createElement('tr');
         tr.style.fontSize = `${fontSize}px`;
 
-        // Group cell
         const groupTd = document.createElement('td');
         const flexDiv = document.createElement('div');
         flexDiv.className = 'tree-node-cell';
@@ -402,7 +400,6 @@ looker.plugins.visualizations.add({
         groupTd.appendChild(flexDiv);
         tr.appendChild(groupTd);
 
-        // Measure cells
         node.totals.forEach(tot => {
           const mTd = document.createElement('td');
           mTd.className = 'text-right';
@@ -412,7 +409,6 @@ looker.plugins.visualizations.add({
 
         bodyEl.appendChild(tr);
 
-        // Render sub-level if expanded
         if (hasChildren && isExpanded) {
           renderNodeList(node.children);
         }
