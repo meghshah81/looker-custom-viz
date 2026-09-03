@@ -192,7 +192,6 @@ looker.plugins.visualizations.add({
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this.clearErrors();
 
-    // Force Looker backend query limit to max 50,000 rows
     if (queryResponse && queryResponse.row_limit < 50000 && !this._requestedLimit) {
       this._requestedLimit = true;
       this.trigger('limit', [50000]);
@@ -319,7 +318,6 @@ looker.plugins.visualizations.add({
       .map(id => measureFields.find(f => f.name === id))
       .filter(Boolean);
 
-    // Detect if measure fields are percentage/rate metrics
     const measureMeta = activeMeasures.map(m => {
       const sampleCell = data[0] && data[0][m.name];
       const isPercent = (sampleCell && sampleCell.rendered && sampleCell.rendered.includes('%')) ||
@@ -383,7 +381,6 @@ looker.plugins.visualizations.add({
       });
     });
 
-    // Determine Grand Totals: Preference given to Looker Native Backend totals_data
     const grandTotals = activeMeasures.map((m, idx) => {
       if (queryResponse && queryResponse.totals_data && queryResponse.totals_data[m.name]) {
         const tCell = queryResponse.totals_data[m.name];
@@ -392,7 +389,6 @@ looker.plugins.visualizations.add({
           : Number(tCell.value).toLocaleString());
       }
 
-      // Client-side fallback aggregation
       if (measureMeta[idx].isPercent) {
         const avg = countTotals[idx] > 0 ? sumTotals[idx] / countTotals[idx] : 0;
         const displayVal = avg <= 1 && avg >= -1 ? avg * 100 : avg;
@@ -418,11 +414,13 @@ looker.plugins.visualizations.add({
     const formatNodeValue = (node, idx) => {
       const isPercent = measureMeta[idx].isPercent;
 
-      // Leaf node display: use direct rendered string from Looker
-      if (node.children.size === 0 && node.leafRendered[idx]) {
+      // Use Looker's pre-formatted rendered string ONLY when this node represents 
+      // a single unaggregated row from the query payload
+      if (node.counts[idx] === 1 && node.leafRendered[idx]) {
         return node.leafRendered[idx];
       }
 
+      // If multiple underlying rows were grouped together under this node
       if (isPercent) {
         const avg = node.counts[idx] > 0 ? node.sums[idx] / node.counts[idx] : 0;
         const displayVal = avg <= 1 && avg >= -1 ? avg * 100 : avg;
@@ -501,7 +499,6 @@ looker.plugins.visualizations.add({
 
     renderNodeList(rootNodes);
 
-    // Build Pill Badge Header HTML
     const visibleDims = activeDims.slice(0, maxRenderedLevel + 1);
     let groupHeaderHtml = '';
 
@@ -522,7 +519,6 @@ looker.plugins.visualizations.add({
       groupHeaderHtml = 'Group';
     }
 
-    // 1. Render Table Header
     const headEl = element.querySelector('#table-head');
     let headHtml = `<tr style="font-size: ${fontSize}px;">`;
     headHtml += `<th style="background-color: ${headerBg}; color: ${headerText};">${groupHeaderHtml}</th>`;
@@ -533,7 +529,6 @@ looker.plugins.visualizations.add({
     headHtml += `</tr>`;
     headEl.innerHTML = headHtml;
 
-    // 2. Render Totals Footer
     const footEl = element.querySelector('#table-foot');
     let footHtml = `<tr class="totals-row" style="font-size: ${fontSize}px;">`;
     footHtml += `<td>Totals</td>`;
