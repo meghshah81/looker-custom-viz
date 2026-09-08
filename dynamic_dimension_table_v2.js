@@ -112,6 +112,16 @@ looker.plugins.visualizations.add({
         .text-right {
           text-align: right;
         }
+        .clickable-drill {
+          color: #0056b3;
+          cursor: pointer;
+          text-decoration: underline;
+          text-decoration-style: dotted;
+        }
+        .clickable-drill:hover {
+          color: #003366;
+          text-decoration: underline;
+        }
         .tree-node-cell {
           display: flex;
           align-items: center;
@@ -195,12 +205,12 @@ looker.plugins.visualizations.add({
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this.clearErrors();
 
-    // FORCE LOOKER TO UPDATE ROW LIMIT AND RE-RUN QUERY
+    // Force limit increase to 50k
     if (queryResponse && queryResponse.row_limit < 50000 && !this._requestedLimit) {
       this._requestedLimit = true;
       this.trigger('query:limit', [50000]);
-      this.trigger('query:run'); // Forces Looker query engine to fetch up to 50k rows
-      return; // Do NOT call done() here so Looker waits for the re-query execution
+      this.trigger('query:run');
+      return;
     }
 
     const warningEl = element.querySelector('#row-limit-warning');
@@ -354,7 +364,8 @@ looker.plugins.visualizations.add({
         const val = cell ? Number(cell.value) : 0;
         return {
           num: isNaN(val) ? 0 : val,
-          rendered: cell ? cell.rendered : null
+          rendered: cell ? cell.rendered : null,
+          links: cell ? cell.links : null // Capture Looker Drill Links
         };
       });
 
@@ -382,6 +393,7 @@ looker.plugins.visualizations.add({
             sums: new Array(activeMeasures.length).fill(0),
             counts: new Array(activeMeasures.length).fill(0),
             leafRendered: new Array(activeMeasures.length).fill(null),
+            leafLinks: new Array(activeMeasures.length).fill(null),
             num1Sum: 0,
             num2Sum: 0
           });
@@ -396,6 +408,9 @@ looker.plugins.visualizations.add({
           node.counts[idx] += 1;
           if (mObj.rendered) {
             node.leafRendered[idx] = mObj.rendered;
+          }
+          if (mObj.links) {
+            node.leafLinks[idx] = mObj.links;
           }
         });
 
@@ -430,21 +445,26 @@ looker.plugins.visualizations.add({
 
     let maxRenderedLevel = 0;
 
-    const formatNodeValue = (node, idx) => {
+    const getNodeValueObj = (node, idx) => {
       const isPercent = measureMeta[idx].isPercent;
 
+      // Leaf Row
       if (node.counts[idx] === 1 && node.leafRendered[idx]) {
-        return node.leafRendered[idx];
+        return {
+          text: node.leafRendered[idx],
+          links: node.leafLinks[idx]
+        };
       }
 
+      // Parent Aggregated Rows
       if (isPercent) {
         if (node.num2Sum > 0) {
           const ratio = (node.num1Sum / node.num2Sum) * 100;
-          return ratio.toFixed(1) + '%';
+          return { text: ratio.toFixed(1) + '%', links: null };
         }
-        return "—";
+        return { text: "—", links: null };
       } else {
-        return node.sums[idx].toLocaleString();
+        return { text: node.sums[idx].toLocaleString(), links: null };
       }
     };
 
@@ -503,7 +523,24 @@ looker.plugins.visualizations.add({
         activeMeasures.forEach((_, idx) => {
           const mTd = document.createElement('td');
           mTd.className = 'text-right';
-          mTd.innerText = formatNodeValue(node, idx);
+
+          const valObj = getNodeValueObj(node, idx);
+          mTd.innerText = valObj.text;
+
+          // ENABLE LOOKER NATIVE DRILL DOWN MENU
+          if (valObj.links && valObj.links.length > 0) {
+            mTd.classList.add('clickable-drill');
+            mTd.addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (LookerVisualizationUtils && LookerVisualizationUtils.openDrillMenu) {
+                LookerVisualizationUtils.openDrillMenu({
+                  links: valObj.links,
+                  event: e
+                });
+              }
+            });
+          }
+
           tr.appendChild(mTd);
         });
 
