@@ -1,8 +1,7 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v1",
-  label: "Dynamic Tree Aggregation Table v1",
+  id: "dynamic_tree_aggregation_table_v2",
+  label: "Dynamic Tree Aggregation Table v2",
   
-  // Set max limit at visualization initialization
   max_limit: 50000,
 
   options: {
@@ -196,12 +195,12 @@ looker.plugins.visualizations.add({
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this.clearErrors();
 
-    // Trigger row limit increase to 50,000
-    if (queryResponse && (queryResponse.row_limit < 50000) && !this._requestedLimit) {
+    // FORCE LOOKER TO UPDATE ROW LIMIT AND RE-RUN QUERY
+    if (queryResponse && queryResponse.row_limit < 50000 && !this._requestedLimit) {
       this._requestedLimit = true;
       this.trigger('query:limit', [50000]);
-      done();
-      return;
+      this.trigger('query:run'); // Forces Looker query engine to fetch up to 50k rows
+      return; // Do NOT call done() here so Looker waits for the re-query execution
     }
 
     const warningEl = element.querySelector('#row-limit-warning');
