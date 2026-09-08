@@ -192,9 +192,11 @@ looker.plugins.visualizations.add({
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this.clearErrors();
 
-    if (queryResponse && queryResponse.row_limit < 50000 && !this._requestedLimit) {
+    // Trigger row limit increase up to 50,000 rows
+    if (queryResponse && (queryResponse.row_limit < 50000) && !this._requestedLimit) {
       this._requestedLimit = true;
-      this.trigger('limit', [50000]);
+      this.trigger('query:limit', [50000]);
+      done();
       return;
     }
 
@@ -382,20 +384,18 @@ looker.plugins.visualizations.add({
     });
 
     const grandTotals = activeMeasures.map((m, idx) => {
-      if (queryResponse && queryResponse.totals_data && queryResponse.totals_data[m.name]) {
-        const tCell = queryResponse.totals_data[m.name];
-        return tCell.rendered || (measureMeta[idx].isPercent 
-          ? (Number(tCell.value) * (tCell.value <= 1 ? 100 : 1)).toFixed(1) + '%'
-          : Number(tCell.value).toLocaleString());
+      // Hide totals for % measures
+      if (measureMeta[idx].isPercent) {
+        return "—";
       }
 
-      if (measureMeta[idx].isPercent) {
-        const avg = countTotals[idx] > 0 ? sumTotals[idx] / countTotals[idx] : 0;
-        const displayVal = avg <= 1 && avg >= -1 ? avg * 100 : avg;
-        return displayVal.toFixed(1) + '%';
-      } else {
-        return sumTotals[idx].toLocaleString();
+      if (queryResponse && queryResponse.totals_data && queryResponse.totals_data[m.name]) {
+        const tCell = queryResponse.totals_data[m.name];
+        if (tCell.rendered) return tCell.rendered;
+        return Number(tCell.value).toLocaleString();
       }
+
+      return sumTotals[idx].toLocaleString();
     });
 
     this.renderTableTree(rootNodes, grandTotals, activeDims, activeMeasures, measureMeta, config, element);
@@ -414,13 +414,12 @@ looker.plugins.visualizations.add({
     const formatNodeValue = (node, idx) => {
       const isPercent = measureMeta[idx].isPercent;
 
-      // Use Looker's pre-formatted rendered string ONLY when this node represents 
-      // a single unaggregated row from the query payload
+      // 1. Single leaf row: Use exact string as seen in Looker data window
       if (node.counts[idx] === 1 && node.leafRendered[idx]) {
         return node.leafRendered[idx];
       }
 
-      // If multiple underlying rows were grouped together under this node
+      // 2. Parent rows: Re-aggregate mathematically
       if (isPercent) {
         const avg = node.counts[idx] > 0 ? node.sums[idx] / node.counts[idx] : 0;
         const displayVal = avg <= 1 && avg >= -1 ? avg * 100 : avg;
