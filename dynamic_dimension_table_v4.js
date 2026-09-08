@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v3",
-  label: "Dynamic Tree Aggregation Table v3",
+  id: "dynamic_tree_aggregation_table_v4",
+  label: "Dynamic Tree Aggregation Table v4",
   
   max_limit: 50000,
 
@@ -113,14 +113,14 @@ looker.plugins.visualizations.add({
           text-align: right;
         }
         .clickable-drill {
-          color: #0056b3;
-          cursor: pointer;
-          text-decoration: underline;
-          text-decoration-style: dotted;
+          color: #0056b3 !important;
+          cursor: pointer !important;
+          text-decoration: underline !important;
+          text-decoration-style: dotted !important;
         }
         .clickable-drill:hover {
-          color: #003366;
-          text-decoration: underline;
+          color: #003366 !important;
+          text-decoration: underline !important;
         }
         .tree-node-cell {
           display: flex;
@@ -205,7 +205,6 @@ looker.plugins.visualizations.add({
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this.clearErrors();
 
-    // Force limit increase to 50k
     if (queryResponse && queryResponse.row_limit < 50000 && !this._requestedLimit) {
       this._requestedLimit = true;
       this.trigger('query:limit', [50000]);
@@ -365,7 +364,7 @@ looker.plugins.visualizations.add({
         return {
           num: isNaN(val) ? 0 : val,
           rendered: cell ? cell.rendered : null,
-          links: cell ? cell.links : null // Capture Looker Drill Links
+          cellData: cell // Retain complete cell object for drill context
         };
       });
 
@@ -393,7 +392,7 @@ looker.plugins.visualizations.add({
             sums: new Array(activeMeasures.length).fill(0),
             counts: new Array(activeMeasures.length).fill(0),
             leafRendered: new Array(activeMeasures.length).fill(null),
-            leafLinks: new Array(activeMeasures.length).fill(null),
+            leafCells: new Array(activeMeasures.length).fill(null),
             num1Sum: 0,
             num2Sum: 0
           });
@@ -409,8 +408,8 @@ looker.plugins.visualizations.add({
           if (mObj.rendered) {
             node.leafRendered[idx] = mObj.rendered;
           }
-          if (mObj.links) {
-            node.leafLinks[idx] = mObj.links;
+          if (mObj.cellData) {
+            node.leafCells[idx] = mObj.cellData;
           }
         });
 
@@ -448,23 +447,21 @@ looker.plugins.visualizations.add({
     const getNodeValueObj = (node, idx) => {
       const isPercent = measureMeta[idx].isPercent;
 
-      // Leaf Row
       if (node.counts[idx] === 1 && node.leafRendered[idx]) {
         return {
           text: node.leafRendered[idx],
-          links: node.leafLinks[idx]
+          cell: node.leafCells[idx]
         };
       }
 
-      // Parent Aggregated Rows
       if (isPercent) {
         if (node.num2Sum > 0) {
           const ratio = (node.num1Sum / node.num2Sum) * 100;
-          return { text: ratio.toFixed(1) + '%', links: null };
+          return { text: ratio.toFixed(1) + '%', cell: null };
         }
-        return { text: "—", links: null };
+        return { text: "—", cell: null };
       } else {
-        return { text: node.sums[idx].toLocaleString(), links: null };
+        return { text: node.sums[idx].toLocaleString(), cell: null };
       }
     };
 
@@ -520,23 +517,38 @@ looker.plugins.visualizations.add({
         groupTd.appendChild(flexDiv);
         tr.appendChild(groupTd);
 
-        activeMeasures.forEach((_, idx) => {
+        activeMeasures.forEach((mObj, idx) => {
           const mTd = document.createElement('td');
           mTd.className = 'text-right';
 
           const valObj = getNodeValueObj(node, idx);
           mTd.innerText = valObj.text;
 
-          // ENABLE LOOKER NATIVE DRILL DOWN MENU
-          if (valObj.links && valObj.links.length > 0) {
+          // UNIVERSAL LOOKER DRILL HANDLER
+          const cellData = valObj.cell;
+          if (cellData && cellData.links && cellData.links.length > 0) {
             mTd.classList.add('clickable-drill');
+            
             mTd.addEventListener('click', (e) => {
+              e.preventDefault();
               e.stopPropagation();
-              if (LookerVisualizationUtils && LookerVisualizationUtils.openDrillMenu) {
-                LookerVisualizationUtils.openDrillMenu({
-                  links: valObj.links,
-                  event: e
-                });
+
+              const drillContext = {
+                links: cellData.links,
+                field: mObj.field,
+                value: cellData.value,
+                rendered: cellData.rendered,
+                event: e
+              };
+
+              // Check Looker global utilities across versions
+              if (typeof LookerCharts !== 'undefined' && LookerCharts.Utils && LookerCharts.Utils.openDrillMenu) {
+                LookerCharts.Utils.openDrillMenu(drillContext);
+              } else if (typeof LookerVisualizationUtils !== 'undefined' && LookerVisualizationUtils.openDrillMenu) {
+                LookerVisualizationUtils.openDrillMenu(drillContext);
+              } else if (LookerVisualizationUtils && LookerVisualizationUtils.openUrl) {
+                // Fallback direct URL opener
+                LookerVisualizationUtils.openUrl(cellData.links[0].url, e);
               }
             });
           }
