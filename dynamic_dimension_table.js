@@ -1,6 +1,10 @@
 looker.plugins.visualizations.add({
   id: "dynamic_tree_aggregation_table",
   label: "Dynamic Tree Aggregation Table",
+  
+  // Set max limit at visualization initialization
+  max_limit: 50000,
+
   options: {
     font_size: {
       type: "number",
@@ -192,8 +196,8 @@ looker.plugins.visualizations.add({
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this.clearErrors();
 
-    // Force Row Limit to 50,000
-    if (queryResponse && queryResponse.row_limit < 50000 && !this._requestedLimit) {
+    // Trigger row limit increase to 50,000
+    if (queryResponse && (queryResponse.row_limit < 50000) && !this._requestedLimit) {
       this._requestedLimit = true;
       this.trigger('query:limit', [50000]);
       done();
@@ -320,7 +324,6 @@ looker.plugins.visualizations.add({
       .map(id => measureFields.find(f => f.name === id))
       .filter(Boolean);
 
-    // Identify hidden numeric measures for weighted ratio calculations (e.g. Total Appointments & Blocked Slots)
     const numFields = measureFields.filter(m => {
       const type = (m.type || '').toLowerCase();
       const name = (m.name || '').toLowerCase();
@@ -356,7 +359,6 @@ looker.plugins.visualizations.add({
         };
       });
 
-      // Fetch row values for underlying numeric metrics (if available)
       const valNum1 = numField1 && row[numField1] ? Number(row[numField1].value || 0) : 0;
       const valNum2 = numField2 && row[numField2] ? Number(row[numField2].value || 0) : 0;
 
@@ -403,7 +405,6 @@ looker.plugins.visualizations.add({
     });
 
     const grandTotals = activeMeasures.map((m, idx) => {
-      // Rule 1: No Totals for percentage columns
       if (measureMeta[idx].isPercent) {
         return "—";
       }
@@ -433,12 +434,10 @@ looker.plugins.visualizations.add({
     const formatNodeValue = (node, idx) => {
       const isPercent = measureMeta[idx].isPercent;
 
-      // 1. Leaf rows: Preserve raw value from Data window
       if (node.counts[idx] === 1 && node.leafRendered[idx]) {
         return node.leafRendered[idx];
       }
 
-      // 2. Parent rows: Re-calculate ratios using total appointments / blocked slots
       if (isPercent) {
         if (node.num2Sum > 0) {
           const ratio = (node.num1Sum / node.num2Sum) * 100;
