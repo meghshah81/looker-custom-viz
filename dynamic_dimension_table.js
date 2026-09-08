@@ -192,8 +192,8 @@ looker.plugins.visualizations.add({
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this.clearErrors();
 
-    // Trigger row limit increase up to 50,000 rows
-    if (queryResponse && (queryResponse.row_limit < 50000) && !this._requestedLimit) {
+    // Force Row Limit to 50,000
+    if (queryResponse && queryResponse.row_limit < 50000 && !this._requestedLimit) {
       this._requestedLimit = true;
       this.trigger('query:limit', [50000]);
       done();
@@ -320,17 +320,28 @@ looker.plugins.visualizations.add({
       .map(id => measureFields.find(f => f.name === id))
       .filter(Boolean);
 
+    // Identify hidden numeric measures for weighted ratio calculations (e.g. Total Appointments & Blocked Slots)
+    const numFields = measureFields.filter(m => {
+      const type = (m.type || '').toLowerCase();
+      const name = (m.name || '').toLowerCase();
+      const label = (m.label || '').toLowerCase();
+      return !type.includes('percent') && !name.includes('rate') && !label.includes('rate') && !label.includes('%');
+    });
+
+    const numField1 = numFields[0] ? numFields[0].name : null;
+    const numField2 = numFields[1] ? numFields[1].name : null;
+
     const measureMeta = activeMeasures.map(m => {
       const sampleCell = data[0] && data[0][m.name];
       const isPercent = (sampleCell && sampleCell.rendered && sampleCell.rendered.includes('%')) ||
                         (m.value_format && m.value_format.includes('%')) ||
-                        (m.type && m.type.includes('percent'));
+                        (m.type && m.type.includes('percent')) ||
+                        (m.label && m.label.toLowerCase().includes('rate'));
       return { field: m, isPercent: isPercent };
     });
 
     const rootNodes = new Map();
     const sumTotals = new Array(activeMeasures.length).fill(0);
-    const countTotals = new Array(activeMeasures.length).fill(0);
 
     data.forEach(row => {
       let currentMap = rootNodes;
@@ -345,9 +356,12 @@ looker.plugins.visualizations.add({
         };
       });
 
+      // Fetch row values for underlying numeric metrics (if available)
+      const valNum1 = numField1 && row[numField1] ? Number(row[numField1].value || 0) : 0;
+      const valNum2 = numField2 && row[numField2] ? Number(row[numField2].value || 0) : 0;
+
       rowMeasures.forEach((mObj, idx) => {
         sumTotals[idx] += mObj.num;
-        countTotals[idx] += 1;
       });
 
       activeDims.forEach((dimField, level) => {
@@ -366,11 +380,16 @@ looker.plugins.visualizations.add({
             children: new Map(),
             sums: new Array(activeMeasures.length).fill(0),
             counts: new Array(activeMeasures.length).fill(0),
-            leafRendered: new Array(activeMeasures.length).fill(null)
+            leafRendered: new Array(activeMeasures.length).fill(null),
+            num1Sum: 0,
+            num2Sum: 0
           });
         }
 
         const node = currentMap.get(rawVal);
+        node.num1Sum += valNum1;
+        node.num2Sum += valNum2;
+
         rowMeasures.forEach((mObj, idx) => {
           node.sums[idx] += mObj.num;
           node.counts[idx] += 1;
@@ -384,7 +403,7 @@ looker.plugins.visualizations.add({
     });
 
     const grandTotals = activeMeasures.map((m, idx) => {
-      // Hide totals for % measures
+      // Rule 1: No Totals for percentage columns
       if (measureMeta[idx].isPercent) {
         return "—";
       }
@@ -414,16 +433,18 @@ looker.plugins.visualizations.add({
     const formatNodeValue = (node, idx) => {
       const isPercent = measureMeta[idx].isPercent;
 
-      // 1. Single leaf row: Use exact string as seen in Looker data window
+      // 1. Leaf rows: Preserve raw value from Data window
       if (node.counts[idx] === 1 && node.leafRendered[idx]) {
         return node.leafRendered[idx];
       }
 
-      // 2. Parent rows: Re-aggregate mathematically
+      // 2. Parent rows: Re-calculate ratios using total appointments / blocked slots
       if (isPercent) {
-        const avg = node.counts[idx] > 0 ? node.sums[idx] / node.counts[idx] : 0;
-        const displayVal = avg <= 1 && avg >= -1 ? avg * 100 : avg;
-        return displayVal.toFixed(1) + '%';
+        if (node.num2Sum > 0) {
+          const ratio = (node.num1Sum / node.num2Sum) * 100;
+          return ratio.toFixed(1) + '%';
+        }
+        return "—";
       } else {
         return node.sums[idx].toLocaleString();
       }
