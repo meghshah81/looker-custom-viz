@@ -1,7 +1,7 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v4",
-  label: "Dynamic Tree Aggregation Table v4",
-  
+  id: "dynamic_tree_aggregation_table_v5",
+  label: "Dynamic Tree Aggregation Table v5 (Pivot Support)",
+
   max_limit: 50000,
 
   options: {
@@ -15,14 +15,24 @@ looker.plugins.visualizations.add({
       type: "string",
       label: "Header Background",
       default: "#003366",
-      display: "color",
       section: "Style"
     },
     header_text_color: {
       type: "string",
       label: "Header Text Color",
       default: "#ffffff",
-      display: "color",
+      section: "Style"
+    },
+    pivot_header_bg_color: {
+      type: "string",
+      label: "Pivot Header Background",
+      default: "#d0d7de",
+      section: "Style"
+    },
+    pivot_header_text_color: {
+      type: "string",
+      label: "Pivot Header Text Color",
+      default: "#1c2d42",
       section: "Style"
     }
   },
@@ -54,7 +64,7 @@ looker.plugins.visualizations.add({
           margin-bottom: 12px;
           display: flex;
           align-items: center;
-          gap: 16px;
+          gap: 12px;
           background: #f8f9fa;
           padding: 8px 12px;
           border-radius: 6px;
@@ -98,6 +108,10 @@ looker.plugins.visualizations.add({
           top: 0;
           z-index: 2;
         }
+        .custom-table th.pivot-hdr {
+          text-align: center;
+          border-bottom: 1px solid #b0b8c4;
+        }
         .custom-table td {
           padding: 6px 12px;
           border: 1px solid #e1e4e8;
@@ -111,6 +125,9 @@ looker.plugins.visualizations.add({
         }
         .text-right {
           text-align: right;
+        }
+        .text-center {
+          text-align: center;
         }
         .clickable-drill {
           color: #0056b3 !important;
@@ -149,7 +166,6 @@ looker.plugins.visualizations.add({
           background-color: #ffffff;
           border-top: 2px solid #a0a0a0;
         }
-
         .hdr-breadcrumb-container {
           display: flex;
           align-items: center;
@@ -167,7 +183,6 @@ looker.plugins.visualizations.add({
           color: rgba(255, 255, 255, 0.9);
           border: 1px solid rgba(255, 255, 255, 0.25);
           white-space: nowrap;
-          letter-spacing: 0.2px;
         }
         .hdr-pill.current-active {
           background: #ffffff;
@@ -198,7 +213,7 @@ looker.plugins.visualizations.add({
 
     this._expandedKeys = new Set();
     this._selectedDims = [null, null, null];
-    this._selectedMeasures = [null];
+    this._selectedMeasures = [null, null, null, null];
     this._requestedLimit = false;
   },
 
@@ -232,16 +247,19 @@ looker.plugins.visualizations.add({
       return;
     }
 
+    // Default Dimension selections
     if (!this._selectedDims[0] || !dimFields.some(d => d.name === this._selectedDims[0])) {
       this._selectedDims[0] = dimFields[0] ? dimFields[0].name : null;
       this._selectedDims[1] = dimFields[1] ? dimFields[1].name : "none";
       this._selectedDims[2] = dimFields[2] ? dimFields[2].name : "none";
     }
 
+    // Default 4 Measure selections
     if (!this._selectedMeasures[0] || !measureFields.some(m => m.name === this._selectedMeasures[0])) {
       this._selectedMeasures[0] = measureFields[0] ? measureFields[0].name : null;
       this._selectedMeasures[1] = measureFields[1] ? measureFields[1].name : "none";
       this._selectedMeasures[2] = measureFields[2] ? measureFields[2].name : "none";
+      this._selectedMeasures[3] = measureFields[3] ? measureFields[3].name : "none";
     }
 
     this.renderControls(dimFields, measureFields, data, config, element);
@@ -285,6 +303,7 @@ looker.plugins.visualizations.add({
       return group;
     };
 
+    // Dimension selectors
     controlsContainer.appendChild(createSelect("Dim 1:", dimFields, this._selectedDims[0], (val) => {
       this._selectedDims[0] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element);
@@ -305,6 +324,7 @@ looker.plugins.visualizations.add({
     sep.innerText = '|';
     controlsContainer.appendChild(sep);
 
+    // 4 Measure selectors
     controlsContainer.appendChild(createSelect("Measure 1:", measureFields, this._selectedMeasures[0], (val) => {
       this._selectedMeasures[0] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element);
@@ -317,6 +337,11 @@ looker.plugins.visualizations.add({
 
     controlsContainer.appendChild(createSelect("Measure 3:", measureFields, this._selectedMeasures[2], (val) => {
       this._selectedMeasures[2] = val;
+      this.processAndRenderData(data, dimFields, measureFields, config, element);
+    }, true));
+
+    controlsContainer.appendChild(createSelect("Measure 4:", measureFields, this._selectedMeasures[3], (val) => {
+      this._selectedMeasures[3] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element);
     }, true));
   },
@@ -332,6 +357,10 @@ looker.plugins.visualizations.add({
       .map(id => measureFields.find(f => f.name === id))
       .filter(Boolean);
 
+    // Identify pivot structures
+    const pivots = (queryResponse && queryResponse.pivots) || [{ key: '$$single$$', data: {} }];
+    const hasPivots = queryResponse && queryResponse.pivots && queryResponse.pivots.length > 0;
+
     const numFields = measureFields.filter(m => {
       const type = (m.type || '').toLowerCase();
       const name = (m.name || '').toLowerCase();
@@ -343,7 +372,7 @@ looker.plugins.visualizations.add({
     const numField2 = numFields[1] ? numFields[1].name : null;
 
     const measureMeta = activeMeasures.map(m => {
-      const sampleCell = data[0] && data[0][m.name];
+      const sampleCell = data[0] && data[0][m.name] ? (hasPivots ? data[0][m.name][pivots[0].key] : data[0][m.name]) : null;
       const isPercent = (sampleCell && sampleCell.rendered && sampleCell.rendered.includes('%')) ||
                         (m.value_format && m.value_format.includes('%')) ||
                         (m.type && m.type.includes('percent')) ||
@@ -352,29 +381,40 @@ looker.plugins.visualizations.add({
     });
 
     const rootNodes = new Map();
-    const sumTotals = new Array(activeMeasures.length).fill(0);
+    // Sum total matrix: pivots x measures
+    const sumTotals = Array.from({ length: pivots.length }, () => new Array(activeMeasures.length).fill(0));
 
     data.forEach(row => {
       let currentMap = rootNodes;
       let currentPath = "";
 
-      const rowMeasures = activeMeasures.map(m => {
-        const cell = row[m.name];
-        const val = cell ? Number(cell.value) : 0;
+      // Build data per pivot column key
+      const pivotRowMeasures = pivots.map(p => {
+        const pKey = p.key;
         return {
-          num: isNaN(val) ? 0 : val,
-          rendered: cell ? cell.rendered : null,
-          cellData: cell // Retain complete cell object for drill context
+          pivotKey: pKey,
+          measures: activeMeasures.map(m => {
+            const cell = hasPivots ? (row[m.name] ? row[m.name][pKey] : null) : row[m.name];
+            const val = cell ? Number(cell.value) : 0;
+            return {
+              num: isNaN(val) ? 0 : val,
+              rendered: cell ? cell.rendered : null,
+              cellData: cell
+            };
+          }),
+          valNum1: numField1 ? Number((hasPivots ? (row[numField1] && row[numField1][pKey]) : row[numField1])?.value || 0) : 0,
+          valNum2: numField2 ? Number((hasPivots ? (row[numField2] && row[numField2][pKey]) : row[numField2])?.value || 0) : 0
         };
       });
 
-      const valNum1 = numField1 && row[numField1] ? Number(row[numField1].value || 0) : 0;
-      const valNum2 = numField2 && row[numField2] ? Number(row[numField2].value || 0) : 0;
-
-      rowMeasures.forEach((mObj, idx) => {
-        sumTotals[idx] += mObj.num;
+      // Accumulate totals
+      pivotRowMeasures.forEach((pObj, pIdx) => {
+        pObj.measures.forEach((mObj, mIdx) => {
+          sumTotals[pIdx][mIdx] += mObj.num;
+        });
       });
 
+      // Populate Tree hierarchy
       activeDims.forEach((dimField, level) => {
         const cell = row[dimField.name];
         const rawVal = (cell && cell.value !== null && cell.value !== undefined && cell.value !== "")
@@ -389,79 +429,85 @@ looker.plugins.visualizations.add({
             path: currentPath,
             level: level,
             children: new Map(),
-            sums: new Array(activeMeasures.length).fill(0),
-            counts: new Array(activeMeasures.length).fill(0),
-            leafRendered: new Array(activeMeasures.length).fill(null),
-            leafCells: new Array(activeMeasures.length).fill(null),
-            num1Sum: 0,
-            num2Sum: 0
+            pivotData: pivots.map(() => ({
+              sums: new Array(activeMeasures.length).fill(0),
+              counts: new Array(activeMeasures.length).fill(0),
+              leafRendered: new Array(activeMeasures.length).fill(null),
+              leafCells: new Array(activeMeasures.length).fill(null),
+              num1Sum: 0,
+              num2Sum: 0
+            }))
           });
         }
 
         const node = currentMap.get(rawVal);
-        node.num1Sum += valNum1;
-        node.num2Sum += valNum2;
 
-        rowMeasures.forEach((mObj, idx) => {
-          node.sums[idx] += mObj.num;
-          node.counts[idx] += 1;
-          if (mObj.rendered) {
-            node.leafRendered[idx] = mObj.rendered;
-          }
-          if (mObj.cellData) {
-            node.leafCells[idx] = mObj.cellData;
-          }
+        pivotRowMeasures.forEach((pObj, pIdx) => {
+          const pNode = node.pivotData[pIdx];
+          pNode.num1Sum += pObj.valNum1;
+          pNode.num2Sum += pObj.valNum2;
+
+          pObj.measures.forEach((mObj, mIdx) => {
+            pNode.sums[mIdx] += mObj.num;
+            pNode.counts[mIdx] += 1;
+            if (mObj.rendered) {
+              pNode.leafRendered[mIdx] = mObj.rendered;
+            }
+            if (mObj.cellData) {
+              pNode.leafCells[mIdx] = mObj.cellData;
+            }
+          });
         });
 
         currentMap = node.children;
       });
     });
 
-    const grandTotals = activeMeasures.map((m, idx) => {
-      if (measureMeta[idx].isPercent) {
-        return "—";
-      }
+    // Grand Totals construction
+    const grandTotals = pivots.map((p, pIdx) => {
+      return activeMeasures.map((m, mIdx) => {
+        if (measureMeta[mIdx].isPercent) return "—";
 
-      if (queryResponse && queryResponse.totals_data && queryResponse.totals_data[m.name]) {
-        const tCell = queryResponse.totals_data[m.name];
-        if (tCell.rendered) return tCell.rendered;
-        return Number(tCell.value).toLocaleString();
-      }
+        if (queryResponse && queryResponse.totals_data && queryResponse.totals_data[m.name]) {
+          const tCell = hasPivots ? queryResponse.totals_data[m.name][p.key] : queryResponse.totals_data[m.name];
+          if (tCell && tCell.rendered) return tCell.rendered;
+          if (tCell && tCell.value !== undefined) return Number(tCell.value).toLocaleString();
+        }
 
-      return sumTotals[idx].toLocaleString();
+        return sumTotals[pIdx][mIdx].toLocaleString();
+      });
     });
 
-    this.renderTableTree(rootNodes, grandTotals, activeDims, activeMeasures, measureMeta, config, element);
+    this.renderTableTree(rootNodes, grandTotals, activeDims, activeMeasures, measureMeta, config, element, pivots, hasPivots);
   },
 
-  renderTableTree: function(rootNodes, grandTotals, activeDims, activeMeasures, measureMeta, config, element) {
+  renderTableTree: function(rootNodes, grandTotals, activeDims, activeMeasures, measureMeta, config, element, pivots, hasPivots) {
     const fontSize = config.font_size || 13;
     const headerBg = config.header_bg_color || "#003366";
     const headerText = config.header_text_color || "#ffffff";
+    const pivotHeaderBg = config.pivot_header_bg_color || "#d0d7de";
+    const pivotHeaderText = config.pivot_header_text_color || "#1c2d42";
 
     const bodyEl = element.querySelector('#table-body');
     bodyEl.innerHTML = '';
 
     let maxRenderedLevel = 0;
 
-    const getNodeValueObj = (node, idx) => {
+    const getNodeValueObj = (pNode, idx) => {
       const isPercent = measureMeta[idx].isPercent;
 
-      if (node.counts[idx] === 1 && node.leafRendered[idx]) {
-        return {
-          text: node.leafRendered[idx],
-          cell: node.leafCells[idx]
-        };
+      if (pNode.counts[idx] === 1 && pNode.leafRendered[idx]) {
+        return { text: pNode.leafRendered[idx], cell: pNode.leafCells[idx] };
       }
 
       if (isPercent) {
-        if (node.num2Sum > 0) {
-          const ratio = (node.num1Sum / node.num2Sum) * 100;
+        if (pNode.num2Sum > 0) {
+          const ratio = (pNode.num1Sum / pNode.num2Sum) * 100;
           return { text: ratio.toFixed(1) + '%', cell: null };
         }
         return { text: "—", cell: null };
       } else {
-        return { text: node.sums[idx].toLocaleString(), cell: null };
+        return { text: pNode.sums[idx].toLocaleString(), cell: null };
       }
     };
 
@@ -510,50 +556,51 @@ looker.plugins.visualizations.add({
             } else {
               this._expandedKeys.add(node.path);
             }
-            this.renderTableTree(rootNodes, grandTotals, activeDims, activeMeasures, measureMeta, config, element);
+            this.renderTableTree(rootNodes, grandTotals, activeDims, activeMeasures, measureMeta, config, element, pivots, hasPivots);
           });
         }
 
         groupTd.appendChild(flexDiv);
         tr.appendChild(groupTd);
 
-        activeMeasures.forEach((mObj, idx) => {
-          const mTd = document.createElement('td');
-          mTd.className = 'text-right';
+        // Render cell per pivot and per measure
+        pivots.forEach((p, pIdx) => {
+          const pNode = node.pivotData[pIdx];
 
-          const valObj = getNodeValueObj(node, idx);
-          mTd.innerText = valObj.text;
+          activeMeasures.forEach((mObj, mIdx) => {
+            const mTd = document.createElement('td');
+            mTd.className = 'text-right';
 
-          // UNIVERSAL LOOKER DRILL HANDLER
-          const cellData = valObj.cell;
-          if (cellData && cellData.links && cellData.links.length > 0) {
-            mTd.classList.add('clickable-drill');
-            
-            mTd.addEventListener('click', (e) => {
-              e.preventDefault();
-              e.stopPropagation();
+            const valObj = getNodeValueObj(pNode, mIdx);
+            mTd.innerText = valObj.text;
 
-              const drillContext = {
-                links: cellData.links,
-                field: mObj.field,
-                value: cellData.value,
-                rendered: cellData.rendered,
-                event: e
-              };
+            const cellData = valObj.cell;
+            if (cellData && cellData.links && cellData.links.length > 0) {
+              mTd.classList.add('clickable-drill');
+              mTd.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
 
-              // Check Looker global utilities across versions
-              if (typeof LookerCharts !== 'undefined' && LookerCharts.Utils && LookerCharts.Utils.openDrillMenu) {
-                LookerCharts.Utils.openDrillMenu(drillContext);
-              } else if (typeof LookerVisualizationUtils !== 'undefined' && LookerVisualizationUtils.openDrillMenu) {
-                LookerVisualizationUtils.openDrillMenu(drillContext);
-              } else if (LookerVisualizationUtils && LookerVisualizationUtils.openUrl) {
-                // Fallback direct URL opener
-                LookerVisualizationUtils.openUrl(cellData.links[0].url, e);
-              }
-            });
-          }
+                const drillContext = {
+                  links: cellData.links,
+                  field: mObj.field,
+                  value: cellData.value,
+                  rendered: cellData.rendered,
+                  event: e
+                };
 
-          tr.appendChild(mTd);
+                if (typeof LookerCharts !== 'undefined' && LookerCharts.Utils && LookerCharts.Utils.openDrillMenu) {
+                  LookerCharts.Utils.openDrillMenu(drillContext);
+                } else if (typeof LookerVisualizationUtils !== 'undefined' && LookerVisualizationUtils.openDrillMenu) {
+                  LookerVisualizationUtils.openDrillMenu(drillContext);
+                } else if (typeof LookerVisualizationUtils !== 'undefined' && LookerVisualizationUtils.openUrl) {
+                  LookerVisualizationUtils.openUrl(cellData.links[0].url, e);
+                }
+              });
+            }
+
+            tr.appendChild(mTd);
+          });
         });
 
         bodyEl.appendChild(tr);
@@ -566,6 +613,7 @@ looker.plugins.visualizations.add({
 
     renderNodeList(rootNodes);
 
+    // Breadcrumbs header rendering
     const visibleDims = activeDims.slice(0, maxRenderedLevel + 1);
     let groupHeaderHtml = '';
 
@@ -586,23 +634,52 @@ looker.plugins.visualizations.add({
       groupHeaderHtml = 'Group';
     }
 
+    // Build 2-Tier Header Structure (Pivot row + Measure row)
     const headEl = element.querySelector('#table-head');
-    let headHtml = `<tr style="font-size: ${fontSize}px;">`;
-    headHtml += `<th style="background-color: ${headerBg}; color: ${headerText};">${groupHeaderHtml}</th>`;
+    let headHtml = '';
 
-    activeMeasures.forEach(m => {
-      headHtml += `<th class="text-right" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
-    });
-    headHtml += `</tr>`;
+    if (hasPivots) {
+      // Top Header Row (Pivots)
+      headHtml += `<tr style="font-size: ${fontSize}px;">`;
+      headHtml += `<th rowspan="2" style="background-color: ${headerBg}; color: ${headerText}; vertical-align: bottom;">${groupHeaderHtml}</th>`;
+
+      pivots.forEach(p => {
+        const pivotLabel = Object.values(p.data).join(' / ') || p.key;
+        headHtml += `<th colspan="${activeMeasures.length}" class="pivot-hdr" style="background-color: ${pivotHeaderBg}; color: ${pivotHeaderText};">${pivotLabel}</th>`;
+      });
+      headHtml += `</tr>`;
+
+      // Bottom Header Row (Measures)
+      headHtml += `<tr style="font-size: ${fontSize}px;">`;
+      pivots.forEach(() => {
+        activeMeasures.forEach(m => {
+          headHtml += `<th class="text-right" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
+        });
+      });
+      headHtml += `</tr>`;
+    } else {
+      // Single Tier (No pivots)
+      headHtml += `<tr style="font-size: ${fontSize}px;">`;
+      headHtml += `<th style="background-color: ${headerBg}; color: ${headerText};">${groupHeaderHtml}</th>`;
+      activeMeasures.forEach(m => {
+        headHtml += `<th class="text-right" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
+      });
+      headHtml += `</tr>`;
+    }
+
     headEl.innerHTML = headHtml;
 
+    // Build Footer Row
     const footEl = element.querySelector('#table-foot');
     let footHtml = `<tr class="totals-row" style="font-size: ${fontSize}px;">`;
     footHtml += `<td>Totals</td>`;
 
-    grandTotals.forEach(tot => {
-      footHtml += `<td class="text-right">${tot}</td>`;
+    pivots.forEach((_, pIdx) => {
+      activeMeasures.forEach((_, mIdx) => {
+        footHtml += `<td class="text-right">${grandTotals[pIdx][mIdx]}</td>`;
+      });
     });
+
     footHtml += `</tr>`;
     footEl.innerHTML = footHtml;
   }
