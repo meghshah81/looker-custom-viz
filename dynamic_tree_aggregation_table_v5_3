@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v5_2",
-  label: "Dynamic Tree Aggregation Table v5.2 (Sticky Headers & Fixes)",
+  id: "dynamic_tree_aggregation_table_v5_3",
+  label: "Dynamic Tree Aggregation Table v5.3 (Fixed Render)",
 
   max_limit: 50000,
 
@@ -93,43 +93,41 @@ looker.plugins.visualizations.add({
           overflow: auto;
           border: 1px solid #d0d7de;
           border-radius: 4px;
+          position: relative;
         }
         .custom-table {
           width: 100%;
-          border-collapse: separate;
-          border-spacing: 0;
+          border-collapse: collapse;
           font-size: 13px;
         }
         .custom-table th {
           text-align: left;
           padding: 8px 12px;
           font-weight: 600;
-          border-right: 1px solid #c8d1dc;
-          border-bottom: 1px solid #c8d1dc;
-          position: sticky;
-          z-index: 2;
+          border: 1px solid #c8d1dc;
           box-sizing: border-box;
         }
-        .custom-table th.sticky-top-tier {
+        .custom-table thead tr:nth-child(1) th {
+          position: sticky;
           top: 0;
           z-index: 4;
         }
-        .custom-table th.sticky-second-tier {
-          top: 31px;
+        .custom-table thead tr:nth-child(2) th {
+          position: sticky;
+          top: 32px;
           z-index: 3;
         }
         .custom-table th.pivot-hdr {
           text-align: center;
-          border-right: 2px solid #94a3b8 !important;
+          border-right: 2px solid #64748b !important;
         }
         .custom-table th.pivot-border-right,
         .custom-table td.pivot-border-right {
-          border-right: 2px solid #94a3b8 !important;
+          border-right: 2px solid #64748b !important;
         }
         .custom-table td {
           padding: 6px 12px;
-          border-right: 1px solid #e1e4e8;
-          border-bottom: 1px solid #e1e4e8;
+          border: 1px solid #e1e4e8;
           color: #212529;
         }
         .custom-table tr:nth-child(even) {
@@ -512,7 +510,6 @@ looker.plugins.visualizations.add({
     const getNodeValueObj = (pNode, idx) => {
       const isPercent = measureMeta[idx].isPercent;
 
-      // Retain Looker's direct formatted rendered string at leaf node level
       if (pNode.counts[idx] === 1 && pNode.leafRendered[idx] !== null && pNode.leafRendered[idx] !== undefined) {
         return { text: pNode.leafRendered[idx], cell: pNode.leafCells[idx] };
       }
@@ -662,11 +659,11 @@ looker.plugins.visualizations.add({
 
     if (hasPivots) {
       headHtml += `<tr style="font-size: ${fontSize}px;">`;
-      headHtml += `<th rowspan="2" class="sticky-top-tier" style="background-color: ${headerBg}; color: ${headerText}; vertical-align: bottom;">${groupHeaderHtml}</th>`;
+      headHtml += `<th rowspan="2" style="background-color: ${headerBg}; color: ${headerText}; vertical-align: bottom;">${groupHeaderHtml}</th>`;
 
       pivots.forEach(p => {
         const pivotLabel = Object.values(p.data).join(' / ') || p.key;
-        headHtml += `<th colspan="${activeMeasures.length}" class="pivot-hdr sticky-top-tier" style="background-color: ${pivotHeaderBg}; color: ${pivotHeaderText};">${pivotLabel}</th>`;
+        headHtml += `<th colspan="${activeMeasures.length}" class="pivot-hdr" style="background-color: ${pivotHeaderBg}; color: ${pivotHeaderText};">${pivotLabel}</th>`;
       });
       headHtml += `</tr>`;
 
@@ -674,15 +671,15 @@ looker.plugins.visualizations.add({
       pivots.forEach(() => {
         activeMeasures.forEach((m, mIdx) => {
           const borderClass = (mIdx === activeMeasures.length - 1) ? 'pivot-border-right' : '';
-          headHtml += `<th class="text-right sticky-second-tier ${borderClass}" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
+          headHtml += `<th class="text-right ${borderClass}" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
         });
       });
       headHtml += `</tr>`;
     } else {
       headHtml += `<tr style="font-size: ${fontSize}px;">`;
-      headHtml += `<th class="sticky-top-tier" style="background-color: ${headerBg}; color: ${headerText};">${groupHeaderHtml}</th>`;
+      headHtml += `<th style="background-color: ${headerBg}; color: ${headerText};">${groupHeaderHtml}</th>`;
       activeMeasures.forEach(m => {
-        headHtml += `<th class="text-right sticky-top-tier" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
+        headHtml += `<th class="text-right" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
       });
       headHtml += `</tr>`;
     }
