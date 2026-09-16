@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v8",
-  label: "Dynamic Tree Aggregation Table v8",
+  id: "dynamic_tree_aggregation_table_v9",
+  label: "Dynamic Tree Aggregation Table v9",
 
   max_limit: 50000,
 
@@ -340,14 +340,7 @@ looker.plugins.visualizations.add({
     const controlsContainer = element.querySelector('#controls-bar');
     controlsContainer.innerHTML = '';
 
-    const getFieldLabel = (field, customOverride) => {
-      if (customOverride && customOverride.trim() !== '') {
-        return customOverride;
-      }
-      return field.label_short || field.label;
-    };
-
-    const createSelect = (staticLabel, optionsList, currentValue, onChange, allowNone = false, slotKey = null) => {
+    const createSelect = (staticLabel, optionsList, currentValue, onChange, allowNone = false) => {
       const group = document.createElement('div');
       group.className = 'control-group';
 
@@ -367,11 +360,8 @@ looker.plugins.visualizations.add({
       optionsList.forEach(field => {
         const opt = document.createElement('option');
         opt.value = field.name;
-        
-        // Show custom overridden label in dropdown options if configured
-        const customOverride = config[slotKey];
-        opt.innerText = getFieldLabel(field, customOverride);
-
+        // Keep actual Looker field names in the dropdown list
+        opt.innerText = field.label_short || field.label;
         select.appendChild(opt);
       });
 
@@ -385,17 +375,17 @@ looker.plugins.visualizations.add({
     controlsContainer.appendChild(createSelect("Dim 1:", dimFields, this._selectedDims[0], (val) => {
       this._selectedDims[0] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, false, 'dim1_label'));
+    }, false));
 
     controlsContainer.appendChild(createSelect("Dim 2:", dimFields, this._selectedDims[1], (val) => {
       this._selectedDims[1] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true, 'dim2_label'));
+    }, true));
 
     controlsContainer.appendChild(createSelect("Dim 3:", dimFields, this._selectedDims[2], (val) => {
       this._selectedDims[2] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true, 'dim3_label'));
+    }, true));
 
     const sep = document.createElement('span');
     sep.style.color = '#ccc';
@@ -405,25 +395,26 @@ looker.plugins.visualizations.add({
     controlsContainer.appendChild(createSelect("Measure 1:", measureFields, this._selectedMeasures[0], (val) => {
       this._selectedMeasures[0] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, false, 'measure1_label'));
+    }, false));
 
     controlsContainer.appendChild(createSelect("Measure 2:", measureFields, this._selectedMeasures[1], (val) => {
       this._selectedMeasures[1] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true, 'measure2_label'));
+    }, true));
 
     controlsContainer.appendChild(createSelect("Measure 3:", measureFields, this._selectedMeasures[2], (val) => {
       this._selectedMeasures[2] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true, 'measure3_label'));
+    }, true));
 
     controlsContainer.appendChild(createSelect("Measure 4:", measureFields, this._selectedMeasures[3], (val) => {
       this._selectedMeasures[3] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true, 'measure4_label'));
+    }, true));
   },
 
   processAndRenderData: function(data, dimFields, measureFields, config, element, queryResponse) {
+    // Dynamically map custom labels based on position slot (Dim 1 -> dim1_label, etc.)
     const activeDims = this._selectedDims
       .map((id, slotIdx) => {
         if (!id || id === 'none') return null;
