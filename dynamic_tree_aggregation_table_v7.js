@@ -1,10 +1,11 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v6",
-  label: "Dynamic Tree Aggregation Table v6",
+  id: "dynamic_tree_aggregation_table_v7",
+  label: "Dynamic Tree Aggregation Table v7",
 
   max_limit: 50000,
 
   options: {
+    // --- Style Options ---
     font_size: {
       type: "number",
       label: "Font Size (px)",
@@ -15,25 +16,80 @@ looker.plugins.visualizations.add({
       type: "string",
       label: "Header Background",
       default: "#003366",
-      section: "Style"
+      section: "Style",
+      display: "color"
     },
     header_text_color: {
       type: "string",
       label: "Header Text Color",
       default: "#ffffff",
-      section: "Style"
+      section: "Style",
+      display: "color"
     },
     pivot_header_bg_color: {
       type: "string",
       label: "Pivot Header Background",
       default: "#d0d7de",
-      section: "Style"
+      section: "Style",
+      display: "color"
     },
     pivot_header_text_color: {
       type: "string",
       label: "Pivot Header Text Color",
       default: "#1c2d42",
-      section: "Style"
+      section: "Style",
+      display: "color"
+    },
+
+    // --- Custom Label Options ---
+    dim1_label: {
+      type: "string",
+      label: "Dimension 1 Label",
+      default: "",
+      placeholder: "Default Field Label",
+      section: "Labels"
+    },
+    dim2_label: {
+      type: "string",
+      label: "Dimension 2 Label",
+      default: "",
+      placeholder: "Default Field Label",
+      section: "Labels"
+    },
+    dim3_label: {
+      type: "string",
+      label: "Dimension 3 Label",
+      default: "",
+      placeholder: "Default Field Label",
+      section: "Labels"
+    },
+    measure1_label: {
+      type: "string",
+      label: "Measure 1 Label",
+      default: "",
+      placeholder: "Default Field Label",
+      section: "Labels"
+    },
+    measure2_label: {
+      type: "string",
+      label: "Measure 2 Label",
+      default: "",
+      placeholder: "Default Field Label",
+      section: "Labels"
+    },
+    measure3_label: {
+      type: "string",
+      label: "Measure 3 Label",
+      default: "",
+      placeholder: "Default Field Label",
+      section: "Labels"
+    },
+    measure4_label: {
+      type: "string",
+      label: "Measure 4 Label",
+      default: "",
+      placeholder: "Default Field Label",
+      section: "Labels"
     }
   },
 
@@ -315,17 +371,25 @@ looker.plugins.visualizations.add({
       return group;
     };
 
-    controlsContainer.appendChild(createSelect("Dim 1:", dimFields, this._selectedDims[0], (val) => {
+    const d1Lbl = config.dim1_label || "Dim 1:";
+    const d2Lbl = config.dim2_label || "Dim 2:";
+    const d3Lbl = config.dim3_label || "Dim 3:";
+    const m1Lbl = config.measure1_label || "Measure 1:";
+    const m2Lbl = config.measure2_label || "Measure 2:";
+    const m3Lbl = config.measure3_label || "Measure 3:";
+    const m4Lbl = config.measure4_label || "Measure 4:";
+
+    controlsContainer.appendChild(createSelect(d1Lbl.endsWith(':') ? d1Lbl : `${d1Lbl}:`, dimFields, this._selectedDims[0], (val) => {
       this._selectedDims[0] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
     }, false));
 
-    controlsContainer.appendChild(createSelect("Dim 2:", dimFields, this._selectedDims[1], (val) => {
+    controlsContainer.appendChild(createSelect(d2Lbl.endsWith(':') ? d2Lbl : `${d2Lbl}:`, dimFields, this._selectedDims[1], (val) => {
       this._selectedDims[1] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
     }, true));
 
-    controlsContainer.appendChild(createSelect("Dim 3:", dimFields, this._selectedDims[2], (val) => {
+    controlsContainer.appendChild(createSelect(d3Lbl.endsWith(':') ? d3Lbl : `${d3Lbl}:`, dimFields, this._selectedDims[2], (val) => {
       this._selectedDims[2] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
     }, true));
@@ -335,22 +399,22 @@ looker.plugins.visualizations.add({
     sep.innerText = '|';
     controlsContainer.appendChild(sep);
 
-    controlsContainer.appendChild(createSelect("Measure 1:", measureFields, this._selectedMeasures[0], (val) => {
+    controlsContainer.appendChild(createSelect(m1Lbl.endsWith(':') ? m1Lbl : `${m1Lbl}:`, measureFields, this._selectedMeasures[0], (val) => {
       this._selectedMeasures[0] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
     }, false));
 
-    controlsContainer.appendChild(createSelect("Measure 2:", measureFields, this._selectedMeasures[1], (val) => {
+    controlsContainer.appendChild(createSelect(m2Lbl.endsWith(':') ? m2Lbl : `${m2Lbl}:`, measureFields, this._selectedMeasures[1], (val) => {
       this._selectedMeasures[1] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
     }, true));
 
-    controlsContainer.appendChild(createSelect("Measure 3:", measureFields, this._selectedMeasures[2], (val) => {
+    controlsContainer.appendChild(createSelect(m3Lbl.endsWith(':') ? m3Lbl : `${m3Lbl}:`, measureFields, this._selectedMeasures[2], (val) => {
       this._selectedMeasures[2] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
     }, true));
 
-    controlsContainer.appendChild(createSelect("Measure 4:", measureFields, this._selectedMeasures[3], (val) => {
+    controlsContainer.appendChild(createSelect(m4Lbl.endsWith(':') ? m4Lbl : `${m4Lbl}:`, measureFields, this._selectedMeasures[3], (val) => {
       this._selectedMeasures[3] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
     }, true));
@@ -358,13 +422,29 @@ looker.plugins.visualizations.add({
 
   processAndRenderData: function(data, dimFields, measureFields, config, element, queryResponse) {
     const activeDims = this._selectedDims
-      .filter(d => d && d !== 'none')
-      .map(id => dimFields.find(f => f.name === id))
+      .map((id, slotIdx) => {
+        if (!id || id === 'none') return null;
+        const field = dimFields.find(f => f.name === id);
+        if (!field) return null;
+        const customOverride = config[`dim${slotIdx + 1}_label`];
+        return {
+          ...field,
+          displayLabel: customOverride && customOverride.trim() !== '' ? customOverride : (field.label_short || field.label)
+        };
+      })
       .filter(Boolean);
 
     const activeMeasures = this._selectedMeasures
-      .filter(m => m && m !== 'none')
-      .map(id => measureFields.find(f => f.name === id))
+      .map((id, slotIdx) => {
+        if (!id || id === 'none') return null;
+        const field = measureFields.find(f => f.name === id);
+        if (!field) return null;
+        const customOverride = config[`measure${slotIdx + 1}_label`];
+        return {
+          ...field,
+          displayLabel: customOverride && customOverride.trim() !== '' ? customOverride : (field.label_short || field.label)
+        };
+      })
       .filter(Boolean);
 
     const pivots = (queryResponse && queryResponse.pivots && queryResponse.pivots.length > 0)
@@ -397,7 +477,6 @@ looker.plugins.visualizations.add({
                         (m.type && m.type.includes('percent')) ||
                         (m.label && m.label.toLowerCase().includes('rate'));
 
-      // Check if Looker format specifies integer (no decimal point in format string or sample rendered value)
       const hasDecimals = (sampleCell && sampleCell.rendered && sampleCell.rendered.includes('.')) ||
                           (m.value_format && m.value_format.includes('.')) ||
                           (m.type && m.type.includes('decimal'));
@@ -526,7 +605,6 @@ looker.plugins.visualizations.add({
       const isPercent = measureMeta[idx].isPercent;
       const hasDecimals = measureMeta[idx].hasDecimals;
 
-      // Use Looker's direct rendered value on leaf rows
       if (pNode.counts[idx] === 1 && pNode.leafRendered[idx] !== null && pNode.leafRendered[idx] !== undefined) {
         return { text: pNode.leafRendered[idx], cell: pNode.leafCells[idx] };
       }
@@ -661,7 +739,7 @@ looker.plugins.visualizations.add({
       groupHeaderHtml = '<div class="hdr-breadcrumb-container">';
       visibleDims.forEach((d, idx) => {
         const isLatest = idx === visibleDims.length - 1;
-        const labelText = d.label_short || d.label;
+        const labelText = d.displayLabel;
         const pillClass = isLatest ? 'hdr-pill current-active' : 'hdr-pill';
 
         groupHeaderHtml += `<span class="${pillClass}">${labelText}</span>`;
@@ -691,7 +769,7 @@ looker.plugins.visualizations.add({
       pivots.forEach(() => {
         activeMeasures.forEach((m, mIdx) => {
           const borderClass = (mIdx === activeMeasures.length - 1) ? 'pivot-border-right' : '';
-          headHtml += `<th class="text-right ${borderClass}" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
+          headHtml += `<th class="text-right ${borderClass}" style="background-color: ${headerBg}; color: ${headerText};">${m.displayLabel}</th>`;
         });
       });
       headHtml += `</tr>`;
@@ -699,7 +777,7 @@ looker.plugins.visualizations.add({
       headHtml += `<tr style="font-size: ${fontSize}px;">`;
       headHtml += `<th style="background-color: ${headerBg}; color: ${headerText};">${groupHeaderHtml}</th>`;
       activeMeasures.forEach(m => {
-        headHtml += `<th class="text-right" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
+        headHtml += `<th class="text-right" style="background-color: ${headerBg}; color: ${headerText};">${m.displayLabel}</th>`;
       });
       headHtml += `</tr>`;
     }
