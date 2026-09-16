@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v5_4",
-  label: "Dynamic Tree Aggregation Table v5 4",
+  id: "dynamic_tree_aggregation_table_v6",
+  label: "Dynamic Tree Aggregation Table v6",
 
   max_limit: 50000,
 
@@ -346,7 +346,7 @@ looker.plugins.visualizations.add({
     }, true));
 
     controlsContainer.appendChild(createSelect("Measure 3:", measureFields, this._selectedMeasures[2], (val) => {
-      this._selectedMeasures[3] = val;
+      this._selectedMeasures[2] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
     }, true));
 
@@ -396,7 +396,13 @@ looker.plugins.visualizations.add({
                         (m.value_format && m.value_format.includes('%')) ||
                         (m.type && m.type.includes('percent')) ||
                         (m.label && m.label.toLowerCase().includes('rate'));
-      return { field: m, isPercent: isPercent };
+
+      // Check if Looker format specifies integer (no decimal point in format string or sample rendered value)
+      const hasDecimals = (sampleCell && sampleCell.rendered && sampleCell.rendered.includes('.')) ||
+                          (m.value_format && m.value_format.includes('.')) ||
+                          (m.type && m.type.includes('decimal'));
+
+      return { field: m, isPercent: isPercent, hasDecimals: !!hasDecimals };
     });
 
     const rootNodes = new Map();
@@ -485,10 +491,16 @@ looker.plugins.visualizations.add({
         if (queryResponse && queryResponse.totals_data && queryResponse.totals_data[m.name]) {
           const tCell = hasPivots ? queryResponse.totals_data[m.name][p.key] : queryResponse.totals_data[m.name];
           if (tCell && tCell.rendered !== undefined && tCell.rendered !== null) return tCell.rendered;
-          if (tCell && tCell.value !== undefined) return Number(tCell.value).toLocaleString();
+          if (tCell && tCell.value !== undefined) {
+            const v = Number(tCell.value);
+            return measureMeta[mIdx].hasDecimals ? v.toLocaleString() : Math.round(v).toLocaleString();
+          }
         }
 
         const totalVal = sumTotals[pIdx][mIdx];
+        if (!measureMeta[mIdx].hasDecimals) {
+          return Math.round(totalVal).toLocaleString();
+        }
         return Number.isInteger(totalVal)
           ? totalVal.toLocaleString()
           : totalVal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -512,8 +524,9 @@ looker.plugins.visualizations.add({
 
     const getNodeValueObj = (pNode, idx) => {
       const isPercent = measureMeta[idx].isPercent;
+      const hasDecimals = measureMeta[idx].hasDecimals;
 
-      // Preserve Looker raw rendered strings on leaf rows
+      // Use Looker's direct rendered value on leaf rows
       if (pNode.counts[idx] === 1 && pNode.leafRendered[idx] !== null && pNode.leafRendered[idx] !== undefined) {
         return { text: pNode.leafRendered[idx], cell: pNode.leafCells[idx] };
       }
@@ -526,6 +539,9 @@ looker.plugins.visualizations.add({
         return { text: "—", cell: null };
       } else {
         const aggregatedSum = pNode.sums[idx];
+        if (!hasDecimals) {
+          return { text: Math.round(aggregatedSum).toLocaleString(), cell: null };
+        }
         const formattedSum = Number.isInteger(aggregatedSum)
           ? aggregatedSum.toLocaleString()
           : aggregatedSum.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -690,7 +706,6 @@ looker.plugins.visualizations.add({
 
     headEl.innerHTML = headHtml;
 
-    // Apply exact dynamic sticky top positioning after elements are inserted into DOM
     requestAnimationFrame(() => {
       const rows = headEl.querySelectorAll('tr');
       if (rows.length === 2) {
