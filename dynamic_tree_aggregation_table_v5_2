@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v5_1",
-  label: "Dynamic Tree Aggregation Table v5.1 (Fixed Pivots)",
+  id: "dynamic_tree_aggregation_table_v5_2",
+  label: "Dynamic Tree Aggregation Table v5.2 (Sticky Headers & Fixes)",
 
   max_limit: 50000,
 
@@ -96,25 +96,40 @@ looker.plugins.visualizations.add({
         }
         .custom-table {
           width: 100%;
-          border-collapse: collapse;
+          border-collapse: separate;
+          border-spacing: 0;
           font-size: 13px;
         }
         .custom-table th {
           text-align: left;
           padding: 8px 12px;
           font-weight: 600;
-          border: 1px solid #c8d1dc;
+          border-right: 1px solid #c8d1dc;
+          border-bottom: 1px solid #c8d1dc;
           position: sticky;
-          top: 0;
           z-index: 2;
+          box-sizing: border-box;
+        }
+        .custom-table th.sticky-top-tier {
+          top: 0;
+          z-index: 4;
+        }
+        .custom-table th.sticky-second-tier {
+          top: 31px;
+          z-index: 3;
         }
         .custom-table th.pivot-hdr {
           text-align: center;
-          border-bottom: 1px solid #b0b8c4;
+          border-right: 2px solid #94a3b8 !important;
+        }
+        .custom-table th.pivot-border-right,
+        .custom-table td.pivot-border-right {
+          border-right: 2px solid #94a3b8 !important;
         }
         .custom-table td {
           padding: 6px 12px;
-          border: 1px solid #e1e4e8;
+          border-right: 1px solid #e1e4e8;
+          border-bottom: 1px solid #e1e4e8;
           color: #212529;
         }
         .custom-table tr:nth-child(even) {
@@ -162,6 +177,9 @@ looker.plugins.visualizations.add({
           font-weight: bold;
           background-color: #ffffff;
           border-top: 2px solid #a0a0a0;
+          position: sticky;
+          bottom: 0;
+          z-index: 2;
         }
         .hdr-breadcrumb-container {
           display: flex;
@@ -244,14 +262,12 @@ looker.plugins.visualizations.add({
       return;
     }
 
-    // Default Dimension Selections
     if (!this._selectedDims[0] || !dimFields.some(d => d.name === this._selectedDims[0])) {
       this._selectedDims[0] = dimFields[0] ? dimFields[0].name : null;
       this._selectedDims[1] = dimFields[1] ? dimFields[1].name : "none";
       this._selectedDims[2] = dimFields[2] ? dimFields[2].name : "none";
     }
 
-    // Default 4 Measure Selections
     if (!this._selectedMeasures[0] || !measureFields.some(m => m.name === this._selectedMeasures[0])) {
       this._selectedMeasures[0] = measureFields[0] ? measureFields[0].name : null;
       this._selectedMeasures[1] = measureFields[1] ? measureFields[1].name : "none";
@@ -352,7 +368,6 @@ looker.plugins.visualizations.add({
       .map(id => measureFields.find(f => f.name === id))
       .filter(Boolean);
 
-    // Dynamic extraction of Looker pivot definitions
     const pivots = (queryResponse && queryResponse.pivots && queryResponse.pivots.length > 0)
       ? queryResponse.pivots
       : [{ key: '$$single$$', data: {} }];
@@ -368,7 +383,6 @@ looker.plugins.visualizations.add({
     const numField1 = numFields[0] ? numFields[0].name : null;
     const numField2 = numFields[1] ? numFields[1].name : null;
 
-    // Helper to extract cell safely across pivoted and non-pivoted datasets
     const getCell = (row, measureName, pivotKey) => {
       if (!row || !row[measureName]) return null;
       if (hasPivots) {
@@ -411,14 +425,12 @@ looker.plugins.visualizations.add({
         };
       });
 
-      // Accumulate totals across pivots
       pivotRowMeasures.forEach((pObj, pIdx) => {
         pObj.measures.forEach((mObj, mIdx) => {
           sumTotals[pIdx][mIdx] += mObj.num;
         });
       });
 
-      // Build tree hierarchy dynamically based on active selected dimensions
       activeDims.forEach((dimField, level) => {
         const cell = row[dimField.name];
         const rawVal = (cell && cell.value !== null && cell.value !== undefined && cell.value !== "")
@@ -454,7 +466,7 @@ looker.plugins.visualizations.add({
           pObj.measures.forEach((mObj, mIdx) => {
             pNode.sums[mIdx] += mObj.num;
             pNode.counts[mIdx] += 1;
-            if (mObj.rendered) {
+            if (mObj.rendered !== null && mObj.rendered !== undefined) {
               pNode.leafRendered[mIdx] = mObj.rendered;
             }
             if (mObj.cellData) {
@@ -467,18 +479,18 @@ looker.plugins.visualizations.add({
       });
     });
 
-    // Grand Totals construction
     const grandTotals = pivots.map((p, pIdx) => {
       return activeMeasures.map((m, mIdx) => {
         if (measureMeta[mIdx].isPercent) return "—";
 
         if (queryResponse && queryResponse.totals_data && queryResponse.totals_data[m.name]) {
           const tCell = hasPivots ? queryResponse.totals_data[m.name][p.key] : queryResponse.totals_data[m.name];
-          if (tCell && tCell.rendered) return tCell.rendered;
+          if (tCell && tCell.rendered !== undefined && tCell.rendered !== null) return tCell.rendered;
           if (tCell && tCell.value !== undefined) return Number(tCell.value).toLocaleString();
         }
 
-        return sumTotals[pIdx][mIdx].toLocaleString();
+        const totalVal = sumTotals[pIdx][mIdx];
+        return Number.isInteger(totalVal) ? totalVal.toLocaleString() : totalVal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
       });
     });
 
@@ -500,7 +512,8 @@ looker.plugins.visualizations.add({
     const getNodeValueObj = (pNode, idx) => {
       const isPercent = measureMeta[idx].isPercent;
 
-      if (pNode.counts[idx] === 1 && pNode.leafRendered[idx]) {
+      // Retain Looker's direct formatted rendered string at leaf node level
+      if (pNode.counts[idx] === 1 && pNode.leafRendered[idx] !== null && pNode.leafRendered[idx] !== undefined) {
         return { text: pNode.leafRendered[idx], cell: pNode.leafCells[idx] };
       }
 
@@ -511,7 +524,11 @@ looker.plugins.visualizations.add({
         }
         return { text: "—", cell: null };
       } else {
-        return { text: pNode.sums[idx].toLocaleString(), cell: null };
+        const aggregatedSum = pNode.sums[idx];
+        const formattedSum = Number.isInteger(aggregatedSum)
+          ? aggregatedSum.toLocaleString()
+          : aggregatedSum.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        return { text: formattedSum, cell: null };
       }
     };
 
@@ -567,13 +584,16 @@ looker.plugins.visualizations.add({
         groupTd.appendChild(flexDiv);
         tr.appendChild(groupTd);
 
-        // Render cells for every pivot and active measure
         pivots.forEach((p, pIdx) => {
           const pNode = node.pivotData[pIdx];
 
           activeMeasures.forEach((mObj, mIdx) => {
             const mTd = document.createElement('td');
             mTd.className = 'text-right';
+
+            if (mIdx === activeMeasures.length - 1 && hasPivots) {
+              mTd.classList.add('pivot-border-right');
+            }
 
             const valObj = getNodeValueObj(pNode, mIdx);
             mTd.innerText = valObj.text;
@@ -617,7 +637,6 @@ looker.plugins.visualizations.add({
 
     renderNodeList(rootNodes);
 
-    // Dynamic breadcrumb generation for active dimensions
     const visibleDims = activeDims.slice(0, maxRenderedLevel + 1);
     let groupHeaderHtml = '';
 
@@ -638,49 +657,46 @@ looker.plugins.visualizations.add({
       groupHeaderHtml = 'Group';
     }
 
-    // Build 2-Tier Header Structure
     const headEl = element.querySelector('#table-head');
     let headHtml = '';
 
     if (hasPivots) {
-      // Top Tier (Pivots)
       headHtml += `<tr style="font-size: ${fontSize}px;">`;
-      headHtml += `<th rowspan="2" style="background-color: ${headerBg}; color: ${headerText}; vertical-align: bottom;">${groupHeaderHtml}</th>`;
+      headHtml += `<th rowspan="2" class="sticky-top-tier" style="background-color: ${headerBg}; color: ${headerText}; vertical-align: bottom;">${groupHeaderHtml}</th>`;
 
       pivots.forEach(p => {
         const pivotLabel = Object.values(p.data).join(' / ') || p.key;
-        headHtml += `<th colspan="${activeMeasures.length}" class="pivot-hdr" style="background-color: ${pivotHeaderBg}; color: ${pivotHeaderText};">${pivotLabel}</th>`;
+        headHtml += `<th colspan="${activeMeasures.length}" class="pivot-hdr sticky-top-tier" style="background-color: ${pivotHeaderBg}; color: ${pivotHeaderText};">${pivotLabel}</th>`;
       });
       headHtml += `</tr>`;
 
-      // Bottom Tier (Measures)
       headHtml += `<tr style="font-size: ${fontSize}px;">`;
       pivots.forEach(() => {
-        activeMeasures.forEach(m => {
-          headHtml += `<th class="text-right" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
+        activeMeasures.forEach((m, mIdx) => {
+          const borderClass = (mIdx === activeMeasures.length - 1) ? 'pivot-border-right' : '';
+          headHtml += `<th class="text-right sticky-second-tier ${borderClass}" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
         });
       });
       headHtml += `</tr>`;
     } else {
-      // Standard Single Tier (No Pivots)
       headHtml += `<tr style="font-size: ${fontSize}px;">`;
-      headHtml += `<th style="background-color: ${headerBg}; color: ${headerText};">${groupHeaderHtml}</th>`;
+      headHtml += `<th class="sticky-top-tier" style="background-color: ${headerBg}; color: ${headerText};">${groupHeaderHtml}</th>`;
       activeMeasures.forEach(m => {
-        headHtml += `<th class="text-right" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
+        headHtml += `<th class="text-right sticky-top-tier" style="background-color: ${headerBg}; color: ${headerText};">${m.label_short || m.label}</th>`;
       });
       headHtml += `</tr>`;
     }
 
     headEl.innerHTML = headHtml;
 
-    // Footer Totals Row
     const footEl = element.querySelector('#table-foot');
     let footHtml = `<tr class="totals-row" style="font-size: ${fontSize}px;">`;
     footHtml += `<td>Totals</td>`;
 
     pivots.forEach((_, pIdx) => {
       activeMeasures.forEach((_, mIdx) => {
-        footHtml += `<td class="text-right">${grandTotals[pIdx][mIdx]}</td>`;
+        const borderClass = (mIdx === activeMeasures.length - 1 && hasPivots) ? 'pivot-border-right' : '';
+        footHtml += `<td class="text-right ${borderClass}">${grandTotals[pIdx][mIdx]}</td>`;
       });
     });
 
