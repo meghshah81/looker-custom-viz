@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v9",
-  label: "Dynamic Tree Aggregation Table v9",
+  id: "dynamic_tree_aggregation_table_v10",
+  label: "Dynamic Tree Aggregation Table v10",
 
   max_limit: 50000,
 
@@ -336,11 +336,25 @@ looker.plugins.visualizations.add({
     done();
   },
 
+  // Helper method to resolve field custom labels based on Looker field index
+  getResolvedFieldLabel: function(field, allFields, config, fieldType) {
+    if (!field) return '';
+    const index = allFields.findIndex(f => f.name === field.name);
+    if (index !== -1) {
+      const configKey = `${fieldType}${index + 1}_label`;
+      const customOverride = config[configKey];
+      if (customOverride && customOverride.trim() !== '') {
+        return customOverride;
+      }
+    }
+    return field.label_short || field.label;
+  },
+
   renderControls: function(dimFields, measureFields, data, config, element, queryResponse) {
     const controlsContainer = element.querySelector('#controls-bar');
     controlsContainer.innerHTML = '';
 
-    const createSelect = (staticLabel, optionsList, currentValue, onChange, allowNone = false) => {
+    const createSelect = (staticLabel, optionsList, currentValue, onChange, allowNone = false, fieldType = 'dim') => {
       const group = document.createElement('div');
       group.className = 'control-group';
 
@@ -360,8 +374,8 @@ looker.plugins.visualizations.add({
       optionsList.forEach(field => {
         const opt = document.createElement('option');
         opt.value = field.name;
-        // Keep actual Looker field names in the dropdown list
-        opt.innerText = field.label_short || field.label;
+        // Dynamically resolve custom label for every field item in the dropdown
+        opt.innerText = this.getResolvedFieldLabel(field, optionsList, config, fieldType);
         select.appendChild(opt);
       });
 
@@ -375,17 +389,17 @@ looker.plugins.visualizations.add({
     controlsContainer.appendChild(createSelect("Dim 1:", dimFields, this._selectedDims[0], (val) => {
       this._selectedDims[0] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, false));
+    }, false, 'dim'));
 
     controlsContainer.appendChild(createSelect("Dim 2:", dimFields, this._selectedDims[1], (val) => {
       this._selectedDims[1] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true));
+    }, true, 'dim'));
 
     controlsContainer.appendChild(createSelect("Dim 3:", dimFields, this._selectedDims[2], (val) => {
       this._selectedDims[2] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true));
+    }, true, 'dim'));
 
     const sep = document.createElement('span');
     sep.style.color = '#ccc';
@@ -395,48 +409,45 @@ looker.plugins.visualizations.add({
     controlsContainer.appendChild(createSelect("Measure 1:", measureFields, this._selectedMeasures[0], (val) => {
       this._selectedMeasures[0] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, false));
+    }, false, 'measure'));
 
     controlsContainer.appendChild(createSelect("Measure 2:", measureFields, this._selectedMeasures[1], (val) => {
       this._selectedMeasures[1] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true));
+    }, true, 'measure'));
 
     controlsContainer.appendChild(createSelect("Measure 3:", measureFields, this._selectedMeasures[2], (val) => {
       this._selectedMeasures[2] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true));
+    }, true, 'measure'));
 
     controlsContainer.appendChild(createSelect("Measure 4:", measureFields, this._selectedMeasures[3], (val) => {
       this._selectedMeasures[3] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true));
+    }, true, 'measure'));
   },
 
   processAndRenderData: function(data, dimFields, measureFields, config, element, queryResponse) {
-    // Dynamically map custom labels based on position slot (Dim 1 -> dim1_label, etc.)
     const activeDims = this._selectedDims
-      .map((id, slotIdx) => {
+      .map(id => {
         if (!id || id === 'none') return null;
         const field = dimFields.find(f => f.name === id);
         if (!field) return null;
-        const customOverride = config[`dim${slotIdx + 1}_label`];
         return {
           ...field,
-          displayLabel: customOverride && customOverride.trim() !== '' ? customOverride : (field.label_short || field.label)
+          displayLabel: this.getResolvedFieldLabel(field, dimFields, config, 'dim')
         };
       })
       .filter(Boolean);
 
     const activeMeasures = this._selectedMeasures
-      .map((id, slotIdx) => {
+      .map(id => {
         if (!id || id === 'none') return null;
         const field = measureFields.find(f => f.name === id);
         if (!field) return null;
-        const customOverride = config[`measure${slotIdx + 1}_label`];
         return {
           ...field,
-          displayLabel: customOverride && customOverride.trim() !== '' ? customOverride : (field.label_short || field.label)
+          displayLabel: this.getResolvedFieldLabel(field, measureFields, config, 'measure')
         };
       })
       .filter(Boolean);
