@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v7",
-  label: "Dynamic Tree Aggregation Table v7",
+  id: "dynamic_tree_aggregation_table_v8",
+  label: "Dynamic Tree Aggregation Table v8",
 
   max_limit: 50000,
 
@@ -340,12 +340,19 @@ looker.plugins.visualizations.add({
     const controlsContainer = element.querySelector('#controls-bar');
     controlsContainer.innerHTML = '';
 
-    const createSelect = (label, optionsList, currentValue, onChange, allowNone = false) => {
+    const getFieldLabel = (field, customOverride) => {
+      if (customOverride && customOverride.trim() !== '') {
+        return customOverride;
+      }
+      return field.label_short || field.label;
+    };
+
+    const createSelect = (staticLabel, optionsList, currentValue, onChange, allowNone = false, slotKey = null) => {
       const group = document.createElement('div');
       group.className = 'control-group';
 
       const lbl = document.createElement('label');
-      lbl.innerText = label;
+      lbl.innerText = staticLabel;
       group.appendChild(lbl);
 
       const select = document.createElement('select');
@@ -360,7 +367,11 @@ looker.plugins.visualizations.add({
       optionsList.forEach(field => {
         const opt = document.createElement('option');
         opt.value = field.name;
-        opt.innerText = field.label_short || field.label;
+        
+        // Show custom overridden label in dropdown options if configured
+        const customOverride = config[slotKey];
+        opt.innerText = getFieldLabel(field, customOverride);
+
         select.appendChild(opt);
       });
 
@@ -371,53 +382,45 @@ looker.plugins.visualizations.add({
       return group;
     };
 
-    const d1Lbl = config.dim1_label || "Dim 1:";
-    const d2Lbl = config.dim2_label || "Dim 2:";
-    const d3Lbl = config.dim3_label || "Dim 3:";
-    const m1Lbl = config.measure1_label || "Measure 1:";
-    const m2Lbl = config.measure2_label || "Measure 2:";
-    const m3Lbl = config.measure3_label || "Measure 3:";
-    const m4Lbl = config.measure4_label || "Measure 4:";
-
-    controlsContainer.appendChild(createSelect(d1Lbl.endsWith(':') ? d1Lbl : `${d1Lbl}:`, dimFields, this._selectedDims[0], (val) => {
+    controlsContainer.appendChild(createSelect("Dim 1:", dimFields, this._selectedDims[0], (val) => {
       this._selectedDims[0] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, false));
+    }, false, 'dim1_label'));
 
-    controlsContainer.appendChild(createSelect(d2Lbl.endsWith(':') ? d2Lbl : `${d2Lbl}:`, dimFields, this._selectedDims[1], (val) => {
+    controlsContainer.appendChild(createSelect("Dim 2:", dimFields, this._selectedDims[1], (val) => {
       this._selectedDims[1] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true));
+    }, true, 'dim2_label'));
 
-    controlsContainer.appendChild(createSelect(d3Lbl.endsWith(':') ? d3Lbl : `${d3Lbl}:`, dimFields, this._selectedDims[2], (val) => {
+    controlsContainer.appendChild(createSelect("Dim 3:", dimFields, this._selectedDims[2], (val) => {
       this._selectedDims[2] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true));
+    }, true, 'dim3_label'));
 
     const sep = document.createElement('span');
     sep.style.color = '#ccc';
     sep.innerText = '|';
     controlsContainer.appendChild(sep);
 
-    controlsContainer.appendChild(createSelect(m1Lbl.endsWith(':') ? m1Lbl : `${m1Lbl}:`, measureFields, this._selectedMeasures[0], (val) => {
+    controlsContainer.appendChild(createSelect("Measure 1:", measureFields, this._selectedMeasures[0], (val) => {
       this._selectedMeasures[0] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, false));
+    }, false, 'measure1_label'));
 
-    controlsContainer.appendChild(createSelect(m2Lbl.endsWith(':') ? m2Lbl : `${m2Lbl}:`, measureFields, this._selectedMeasures[1], (val) => {
+    controlsContainer.appendChild(createSelect("Measure 2:", measureFields, this._selectedMeasures[1], (val) => {
       this._selectedMeasures[1] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true));
+    }, true, 'measure2_label'));
 
-    controlsContainer.appendChild(createSelect(m3Lbl.endsWith(':') ? m3Lbl : `${m3Lbl}:`, measureFields, this._selectedMeasures[2], (val) => {
+    controlsContainer.appendChild(createSelect("Measure 3:", measureFields, this._selectedMeasures[2], (val) => {
       this._selectedMeasures[2] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true));
+    }, true, 'measure3_label'));
 
-    controlsContainer.appendChild(createSelect(m4Lbl.endsWith(':') ? m4Lbl : `${m4Lbl}:`, measureFields, this._selectedMeasures[3], (val) => {
+    controlsContainer.appendChild(createSelect("Measure 4:", measureFields, this._selectedMeasures[3], (val) => {
       this._selectedMeasures[3] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true));
+    }, true, 'measure4_label'));
   },
 
   processAndRenderData: function(data, dimFields, measureFields, config, element, queryResponse) {
