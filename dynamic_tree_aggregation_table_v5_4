@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v5_3",
-  label: "Dynamic Tree Aggregation Table v5.3 (Fixed Render)",
+  id: "dynamic_tree_aggregation_table_v5_4",
+  label: "Dynamic Tree Aggregation Table v5 4",
 
   max_limit: 50000,
 
@@ -97,43 +97,39 @@ looker.plugins.visualizations.add({
         }
         .custom-table {
           width: 100%;
-          border-collapse: collapse;
+          border-collapse: separate;
+          border-spacing: 0;
           font-size: 13px;
         }
         .custom-table th {
           text-align: left;
           padding: 8px 12px;
           font-weight: 600;
-          border: 1px solid #c8d1dc;
+          border-right: 1px solid #c8d1dc;
+          border-bottom: 1px solid #c8d1dc;
           box-sizing: border-box;
-        }
-        .custom-table thead tr:nth-child(1) th {
           position: sticky;
-          top: 0;
-          z-index: 4;
-        }
-        .custom-table thead tr:nth-child(2) th {
-          position: sticky;
-          top: 32px;
-          z-index: 3;
+          z-index: 2;
         }
         .custom-table th.pivot-hdr {
           text-align: center;
-          border-right: 2px solid #64748b !important;
+          border-right: 2px solid #475569 !important;
         }
         .custom-table th.pivot-border-right,
         .custom-table td.pivot-border-right {
-          border-right: 2px solid #64748b !important;
+          border-right: 2px solid #475569 !important;
         }
         .custom-table td {
           padding: 6px 12px;
-          border: 1px solid #e1e4e8;
+          border-right: 1px solid #e1e4e8;
+          border-bottom: 1px solid #e1e4e8;
           color: #212529;
+          background: #fff;
         }
-        .custom-table tr:nth-child(even) {
+        .custom-table tr:nth-child(even) td {
           background-color: #f6f8fa;
         }
-        .custom-table tr:hover {
+        .custom-table tr:hover td {
           background-color: #eaf2ff;
         }
         .text-right {
@@ -173,11 +169,11 @@ looker.plugins.visualizations.add({
         }
         .totals-row td {
           font-weight: bold;
-          background-color: #ffffff;
+          background-color: #ffffff !important;
           border-top: 2px solid #a0a0a0;
           position: sticky;
           bottom: 0;
-          z-index: 2;
+          z-index: 3;
         }
         .hdr-breadcrumb-container {
           display: flex;
@@ -231,50 +227,55 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
-    this.clearErrors();
+    try {
+      this.clearErrors();
 
-    if (queryResponse && queryResponse.row_limit < 50000 && !this._requestedLimit) {
-      this._requestedLimit = true;
-      this.trigger('query:limit', [50000]);
-      this.trigger('query:run');
-      return;
+      if (queryResponse && queryResponse.row_limit < 50000 && !this._requestedLimit) {
+        this._requestedLimit = true;
+        this.trigger('query:limit', [50000]);
+        this.trigger('query:run');
+        return;
+      }
+
+      const warningEl = element.querySelector('#row-limit-warning');
+      if (queryResponse && queryResponse.has_reached_row_limit) {
+        warningEl.style.display = 'block';
+        warningEl.innerText = `⚠️ Visualization row limit (${(queryResponse.row_limit || 50000).toLocaleString()} rows) reached. Sub-aggregations are based on retrieved dataset.`;
+      } else {
+        warningEl.style.display = 'none';
+      }
+
+      const dimFields = (queryResponse && queryResponse.fields && queryResponse.fields.dimension_like) || [];
+      const measureFields = (queryResponse && queryResponse.fields && queryResponse.fields.measure_like) || [];
+
+      if (dimFields.length === 0 || measureFields.length === 0) {
+        this.addError({
+          title: "Missing Fields",
+          message: "Requires at least 1 dimension and 1 measure."
+        });
+        done();
+        return;
+      }
+
+      if (!this._selectedDims[0] || !dimFields.some(d => d.name === this._selectedDims[0])) {
+        this._selectedDims[0] = dimFields[0] ? dimFields[0].name : null;
+        this._selectedDims[1] = dimFields[1] ? dimFields[1].name : "none";
+        this._selectedDims[2] = dimFields[2] ? dimFields[2].name : "none";
+      }
+
+      if (!this._selectedMeasures[0] || !measureFields.some(m => m.name === this._selectedMeasures[0])) {
+        this._selectedMeasures[0] = measureFields[0] ? measureFields[0].name : null;
+        this._selectedMeasures[1] = measureFields[1] ? measureFields[1].name : "none";
+        this._selectedMeasures[2] = measureFields[2] ? measureFields[2].name : "none";
+        this._selectedMeasures[3] = measureFields[3] ? measureFields[3].name : "none";
+      }
+
+      this.renderControls(dimFields, measureFields, data, config, element, queryResponse);
+      this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
+    } catch (err) {
+      console.error("Looker Vis Error:", err);
+      this.addError({ title: "Render Error", message: err.message });
     }
-
-    const warningEl = element.querySelector('#row-limit-warning');
-    if (queryResponse && queryResponse.has_reached_row_limit) {
-      warningEl.style.display = 'block';
-      warningEl.innerText = `⚠️ Visualization row limit (${(queryResponse.row_limit || 50000).toLocaleString()} rows) reached. Sub-aggregations are based on retrieved dataset.`;
-    } else {
-      warningEl.style.display = 'none';
-    }
-
-    const dimFields = queryResponse.fields.dimension_like || [];
-    const measureFields = queryResponse.fields.measure_like || [];
-
-    if (dimFields.length === 0 || measureFields.length === 0) {
-      this.addError({
-        title: "Missing Fields",
-        message: "Requires at least 1 dimension and 1 measure."
-      });
-      done();
-      return;
-    }
-
-    if (!this._selectedDims[0] || !dimFields.some(d => d.name === this._selectedDims[0])) {
-      this._selectedDims[0] = dimFields[0] ? dimFields[0].name : null;
-      this._selectedDims[1] = dimFields[1] ? dimFields[1].name : "none";
-      this._selectedDims[2] = dimFields[2] ? dimFields[2].name : "none";
-    }
-
-    if (!this._selectedMeasures[0] || !measureFields.some(m => m.name === this._selectedMeasures[0])) {
-      this._selectedMeasures[0] = measureFields[0] ? measureFields[0].name : null;
-      this._selectedMeasures[1] = measureFields[1] ? measureFields[1].name : "none";
-      this._selectedMeasures[2] = measureFields[2] ? measureFields[2].name : "none";
-      this._selectedMeasures[3] = measureFields[3] ? measureFields[3].name : "none";
-    }
-
-    this.renderControls(dimFields, measureFields, data, config, element, queryResponse);
-    this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
 
     done();
   },
@@ -345,7 +346,7 @@ looker.plugins.visualizations.add({
     }, true));
 
     controlsContainer.appendChild(createSelect("Measure 3:", measureFields, this._selectedMeasures[2], (val) => {
-      this._selectedMeasures[2] = val;
+      this._selectedMeasures[3] = val;
       this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
     }, true));
 
@@ -390,7 +391,7 @@ looker.plugins.visualizations.add({
     };
 
     const measureMeta = activeMeasures.map(m => {
-      const sampleCell = data[0] ? getCell(data[0], m.name, pivots[0].key) : null;
+      const sampleCell = data && data[0] ? getCell(data[0], m.name, pivots[0].key) : null;
       const isPercent = (sampleCell && sampleCell.rendered && sampleCell.rendered.includes('%')) ||
                         (m.value_format && m.value_format.includes('%')) ||
                         (m.type && m.type.includes('percent')) ||
@@ -401,7 +402,7 @@ looker.plugins.visualizations.add({
     const rootNodes = new Map();
     const sumTotals = Array.from({ length: pivots.length }, () => new Array(activeMeasures.length).fill(0));
 
-    data.forEach(row => {
+    (data || []).forEach(row => {
       let currentMap = rootNodes;
       let currentPath = "";
 
@@ -488,7 +489,9 @@ looker.plugins.visualizations.add({
         }
 
         const totalVal = sumTotals[pIdx][mIdx];
-        return Number.isInteger(totalVal) ? totalVal.toLocaleString() : totalVal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        return Number.isInteger(totalVal)
+          ? totalVal.toLocaleString()
+          : totalVal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
       });
     });
 
@@ -510,6 +513,7 @@ looker.plugins.visualizations.add({
     const getNodeValueObj = (pNode, idx) => {
       const isPercent = measureMeta[idx].isPercent;
 
+      // Preserve Looker raw rendered strings on leaf rows
       if (pNode.counts[idx] === 1 && pNode.leafRendered[idx] !== null && pNode.leafRendered[idx] !== undefined) {
         return { text: pNode.leafRendered[idx], cell: pNode.leafCells[idx] };
       }
@@ -662,7 +666,7 @@ looker.plugins.visualizations.add({
       headHtml += `<th rowspan="2" style="background-color: ${headerBg}; color: ${headerText}; vertical-align: bottom;">${groupHeaderHtml}</th>`;
 
       pivots.forEach(p => {
-        const pivotLabel = Object.values(p.data).join(' / ') || p.key;
+        const pivotLabel = (p.data && Object.values(p.data).join(' / ')) || p.key;
         headHtml += `<th colspan="${activeMeasures.length}" class="pivot-hdr" style="background-color: ${pivotHeaderBg}; color: ${pivotHeaderText};">${pivotLabel}</th>`;
       });
       headHtml += `</tr>`;
@@ -685,6 +689,35 @@ looker.plugins.visualizations.add({
     }
 
     headEl.innerHTML = headHtml;
+
+    // Apply exact dynamic sticky top positioning after elements are inserted into DOM
+    requestAnimationFrame(() => {
+      const rows = headEl.querySelectorAll('tr');
+      if (rows.length === 2) {
+        const topRowThs = rows[0].querySelectorAll('th');
+        const bottomRowThs = rows[1].querySelectorAll('th');
+        const row1Height = rows[0].getBoundingClientRect().height;
+
+        topRowThs.forEach(th => {
+          th.style.position = 'sticky';
+          th.style.top = '0px';
+          th.style.zIndex = '5';
+        });
+
+        bottomRowThs.forEach(th => {
+          th.style.position = 'sticky';
+          th.style.top = `${row1Height}px`;
+          th.style.zIndex = '4';
+        });
+      } else if (rows.length === 1) {
+        const ths = rows[0].querySelectorAll('th');
+        ths.forEach(th => {
+          th.style.position = 'sticky';
+          th.style.top = '0px';
+          th.style.zIndex = '5';
+        });
+      }
+    });
 
     const footEl = element.querySelector('#table-foot');
     let footHtml = `<tr class="totals-row" style="font-size: ${fontSize}px;">`;
