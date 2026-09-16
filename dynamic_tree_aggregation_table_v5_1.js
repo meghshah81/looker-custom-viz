@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v5",
-  label: "Dynamic Tree Aggregation Table v5 (Pivot Support)",
+  id: "dynamic_tree_aggregation_table_v5_1",
+  label: "Dynamic Tree Aggregation Table v5.1 (Fixed Pivots)",
 
   max_limit: 50000,
 
@@ -126,9 +126,6 @@ looker.plugins.visualizations.add({
         .text-right {
           text-align: right;
         }
-        .text-center {
-          text-align: center;
-        }
         .clickable-drill {
           color: #0056b3 !important;
           cursor: pointer !important;
@@ -247,14 +244,14 @@ looker.plugins.visualizations.add({
       return;
     }
 
-    // Default Dimension selections
+    // Default Dimension Selections
     if (!this._selectedDims[0] || !dimFields.some(d => d.name === this._selectedDims[0])) {
       this._selectedDims[0] = dimFields[0] ? dimFields[0].name : null;
       this._selectedDims[1] = dimFields[1] ? dimFields[1].name : "none";
       this._selectedDims[2] = dimFields[2] ? dimFields[2].name : "none";
     }
 
-    // Default 4 Measure selections
+    // Default 4 Measure Selections
     if (!this._selectedMeasures[0] || !measureFields.some(m => m.name === this._selectedMeasures[0])) {
       this._selectedMeasures[0] = measureFields[0] ? measureFields[0].name : null;
       this._selectedMeasures[1] = measureFields[1] ? measureFields[1].name : "none";
@@ -262,13 +259,13 @@ looker.plugins.visualizations.add({
       this._selectedMeasures[3] = measureFields[3] ? measureFields[3].name : "none";
     }
 
-    this.renderControls(dimFields, measureFields, data, config, element);
+    this.renderControls(dimFields, measureFields, data, config, element, queryResponse);
     this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
 
     done();
   },
 
-  renderControls: function(dimFields, measureFields, data, config, element) {
+  renderControls: function(dimFields, measureFields, data, config, element, queryResponse) {
     const controlsContainer = element.querySelector('#controls-bar');
     controlsContainer.innerHTML = '';
 
@@ -303,20 +300,19 @@ looker.plugins.visualizations.add({
       return group;
     };
 
-    // Dimension selectors
     controlsContainer.appendChild(createSelect("Dim 1:", dimFields, this._selectedDims[0], (val) => {
       this._selectedDims[0] = val;
-      this.processAndRenderData(data, dimFields, measureFields, config, element);
+      this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
     }, false));
 
     controlsContainer.appendChild(createSelect("Dim 2:", dimFields, this._selectedDims[1], (val) => {
       this._selectedDims[1] = val;
-      this.processAndRenderData(data, dimFields, measureFields, config, element);
+      this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
     }, true));
 
     controlsContainer.appendChild(createSelect("Dim 3:", dimFields, this._selectedDims[2], (val) => {
       this._selectedDims[2] = val;
-      this.processAndRenderData(data, dimFields, measureFields, config, element);
+      this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
     }, true));
 
     const sep = document.createElement('span');
@@ -324,25 +320,24 @@ looker.plugins.visualizations.add({
     sep.innerText = '|';
     controlsContainer.appendChild(sep);
 
-    // 4 Measure selectors
     controlsContainer.appendChild(createSelect("Measure 1:", measureFields, this._selectedMeasures[0], (val) => {
       this._selectedMeasures[0] = val;
-      this.processAndRenderData(data, dimFields, measureFields, config, element);
+      this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
     }, false));
 
     controlsContainer.appendChild(createSelect("Measure 2:", measureFields, this._selectedMeasures[1], (val) => {
       this._selectedMeasures[1] = val;
-      this.processAndRenderData(data, dimFields, measureFields, config, element);
+      this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
     }, true));
 
     controlsContainer.appendChild(createSelect("Measure 3:", measureFields, this._selectedMeasures[2], (val) => {
       this._selectedMeasures[2] = val;
-      this.processAndRenderData(data, dimFields, measureFields, config, element);
+      this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
     }, true));
 
     controlsContainer.appendChild(createSelect("Measure 4:", measureFields, this._selectedMeasures[3], (val) => {
       this._selectedMeasures[3] = val;
-      this.processAndRenderData(data, dimFields, measureFields, config, element);
+      this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
     }, true));
   },
 
@@ -357,8 +352,10 @@ looker.plugins.visualizations.add({
       .map(id => measureFields.find(f => f.name === id))
       .filter(Boolean);
 
-    // Identify pivot structures
-    const pivots = (queryResponse && queryResponse.pivots) || [{ key: '$$single$$', data: {} }];
+    // Dynamic extraction of Looker pivot definitions
+    const pivots = (queryResponse && queryResponse.pivots && queryResponse.pivots.length > 0)
+      ? queryResponse.pivots
+      : [{ key: '$$single$$', data: {} }];
     const hasPivots = queryResponse && queryResponse.pivots && queryResponse.pivots.length > 0;
 
     const numFields = measureFields.filter(m => {
@@ -371,8 +368,17 @@ looker.plugins.visualizations.add({
     const numField1 = numFields[0] ? numFields[0].name : null;
     const numField2 = numFields[1] ? numFields[1].name : null;
 
+    // Helper to extract cell safely across pivoted and non-pivoted datasets
+    const getCell = (row, measureName, pivotKey) => {
+      if (!row || !row[measureName]) return null;
+      if (hasPivots) {
+        return row[measureName][pivotKey] || null;
+      }
+      return row[measureName];
+    };
+
     const measureMeta = activeMeasures.map(m => {
-      const sampleCell = data[0] && data[0][m.name] ? (hasPivots ? data[0][m.name][pivots[0].key] : data[0][m.name]) : null;
+      const sampleCell = data[0] ? getCell(data[0], m.name, pivots[0].key) : null;
       const isPercent = (sampleCell && sampleCell.rendered && sampleCell.rendered.includes('%')) ||
                         (m.value_format && m.value_format.includes('%')) ||
                         (m.type && m.type.includes('percent')) ||
@@ -381,20 +387,18 @@ looker.plugins.visualizations.add({
     });
 
     const rootNodes = new Map();
-    // Sum total matrix: pivots x measures
     const sumTotals = Array.from({ length: pivots.length }, () => new Array(activeMeasures.length).fill(0));
 
     data.forEach(row => {
       let currentMap = rootNodes;
       let currentPath = "";
 
-      // Build data per pivot column key
       const pivotRowMeasures = pivots.map(p => {
         const pKey = p.key;
         return {
           pivotKey: pKey,
           measures: activeMeasures.map(m => {
-            const cell = hasPivots ? (row[m.name] ? row[m.name][pKey] : null) : row[m.name];
+            const cell = getCell(row, m.name, pKey);
             const val = cell ? Number(cell.value) : 0;
             return {
               num: isNaN(val) ? 0 : val,
@@ -402,19 +406,19 @@ looker.plugins.visualizations.add({
               cellData: cell
             };
           }),
-          valNum1: numField1 ? Number((hasPivots ? (row[numField1] && row[numField1][pKey]) : row[numField1])?.value || 0) : 0,
-          valNum2: numField2 ? Number((hasPivots ? (row[numField2] && row[numField2][pKey]) : row[numField2])?.value || 0) : 0
+          valNum1: numField1 ? Number(getCell(row, numField1, pKey)?.value || 0) : 0,
+          valNum2: numField2 ? Number(getCell(row, numField2, pKey)?.value || 0) : 0
         };
       });
 
-      // Accumulate totals
+      // Accumulate totals across pivots
       pivotRowMeasures.forEach((pObj, pIdx) => {
         pObj.measures.forEach((mObj, mIdx) => {
           sumTotals[pIdx][mIdx] += mObj.num;
         });
       });
 
-      // Populate Tree hierarchy
+      // Build tree hierarchy dynamically based on active selected dimensions
       activeDims.forEach((dimField, level) => {
         const cell = row[dimField.name];
         const rawVal = (cell && cell.value !== null && cell.value !== undefined && cell.value !== "")
@@ -563,7 +567,7 @@ looker.plugins.visualizations.add({
         groupTd.appendChild(flexDiv);
         tr.appendChild(groupTd);
 
-        // Render cell per pivot and per measure
+        // Render cells for every pivot and active measure
         pivots.forEach((p, pIdx) => {
           const pNode = node.pivotData[pIdx];
 
@@ -613,7 +617,7 @@ looker.plugins.visualizations.add({
 
     renderNodeList(rootNodes);
 
-    // Breadcrumbs header rendering
+    // Dynamic breadcrumb generation for active dimensions
     const visibleDims = activeDims.slice(0, maxRenderedLevel + 1);
     let groupHeaderHtml = '';
 
@@ -634,12 +638,12 @@ looker.plugins.visualizations.add({
       groupHeaderHtml = 'Group';
     }
 
-    // Build 2-Tier Header Structure (Pivot row + Measure row)
+    // Build 2-Tier Header Structure
     const headEl = element.querySelector('#table-head');
     let headHtml = '';
 
     if (hasPivots) {
-      // Top Header Row (Pivots)
+      // Top Tier (Pivots)
       headHtml += `<tr style="font-size: ${fontSize}px;">`;
       headHtml += `<th rowspan="2" style="background-color: ${headerBg}; color: ${headerText}; vertical-align: bottom;">${groupHeaderHtml}</th>`;
 
@@ -649,7 +653,7 @@ looker.plugins.visualizations.add({
       });
       headHtml += `</tr>`;
 
-      // Bottom Header Row (Measures)
+      // Bottom Tier (Measures)
       headHtml += `<tr style="font-size: ${fontSize}px;">`;
       pivots.forEach(() => {
         activeMeasures.forEach(m => {
@@ -658,7 +662,7 @@ looker.plugins.visualizations.add({
       });
       headHtml += `</tr>`;
     } else {
-      // Single Tier (No pivots)
+      // Standard Single Tier (No Pivots)
       headHtml += `<tr style="font-size: ${fontSize}px;">`;
       headHtml += `<th style="background-color: ${headerBg}; color: ${headerText};">${groupHeaderHtml}</th>`;
       activeMeasures.forEach(m => {
@@ -669,7 +673,7 @@ looker.plugins.visualizations.add({
 
     headEl.innerHTML = headHtml;
 
-    // Build Footer Row
+    // Footer Totals Row
     const footEl = element.querySelector('#table-foot');
     let footHtml = `<tr class="totals-row" style="font-size: ${fontSize}px;">`;
     footHtml += `<td>Totals</td>`;
