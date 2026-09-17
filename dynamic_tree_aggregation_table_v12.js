@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v11",
-  label: "dynamic_tree_aggregation_table_v11",
+  id: "dynamic_tree_aggregation_table_v12",
+  label: "dynamic_tree_aggregation_table_v12",
 
   max_limit: 50000,
 
@@ -167,7 +167,6 @@ looker.plugins.visualizations.add({
           position: sticky;
           z-index: 2;
         }
-        /* Normal border for pivot column separators */
         .custom-table th.pivot-hdr {
           text-align: center;
           border-right: 1px solid #c8d1dc !important;
@@ -334,17 +333,27 @@ looker.plugins.visualizations.add({
         return;
       }
 
-      if (!this._selectedDims[0] || !dimFields.some(d => d.name === this._selectedDims[0])) {
-        this._selectedDims[0] = dimFields[0] ? dimFields[0].name : null;
-        this._selectedDims[1] = dimFields[1] ? dimFields[1].name : "none";
-        this._selectedDims[2] = dimFields[2] ? dimFields[2].name : "none";
+      // Default Selections limited to pulled fields length
+      const maxDimSlots = Math.min(dimFields.length, 3);
+      for (let i = 0; i < 3; i++) {
+        if (i < maxDimSlots) {
+          if (!this._selectedDims[i] || !dimFields.some(d => d.name === this._selectedDims[i])) {
+            this._selectedDims[i] = dimFields[i] ? dimFields[i].name : "none";
+          }
+        } else {
+          this._selectedDims[i] = "none";
+        }
       }
 
-      if (!this._selectedMeasures[0] || !measureFields.some(m => m.name === this._selectedMeasures[0])) {
-        this._selectedMeasures[0] = measureFields[0] ? measureFields[0].name : null;
-        this._selectedMeasures[1] = measureFields[1] ? measureFields[1].name : "none";
-        this._selectedMeasures[2] = measureFields[2] ? measureFields[2].name : "none";
-        this._selectedMeasures[3] = measureFields[3] ? measureFields[3].name : "none";
+      const maxMeasureSlots = Math.min(measureFields.length, 4);
+      for (let i = 0; i < 4; i++) {
+        if (i < maxMeasureSlots) {
+          if (!this._selectedMeasures[i] || !measureFields.some(m => m.name === this._selectedMeasures[i])) {
+            this._selectedMeasures[i] = measureFields[i] ? measureFields[i].name : "none";
+          }
+        } else {
+          this._selectedMeasures[i] = "none";
+        }
       }
 
       this.renderControls(dimFields, measureFields, data, config, element, queryResponse);
@@ -405,45 +414,32 @@ looker.plugins.visualizations.add({
       return group;
     };
 
-    controlsContainer.appendChild(createSelect("Dim 1:", dimFields, this._selectedDims[0], (val) => {
-      this._selectedDims[0] = val;
-      this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, false, 'dim'));
-
-    controlsContainer.appendChild(createSelect("Dim 2:", dimFields, this._selectedDims[1], (val) => {
-      this._selectedDims[1] = val;
-      this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true, 'dim'));
-
-    controlsContainer.appendChild(createSelect("Dim 3:", dimFields, this._selectedDims[2], (val) => {
-      this._selectedDims[2] = val;
-      this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true, 'dim'));
+    // Dynamically render dimension dropdowns according to pulled fields count
+    const numDimsToRender = Math.min(dimFields.length, 3);
+    for (let i = 0; i < numDimsToRender; i++) {
+      const label = `Dim ${i + 1}:`;
+      const allowNone = i > 0;
+      controlsContainer.appendChild(createSelect(label, dimFields, this._selectedDims[i], (val) => {
+        this._selectedDims[i] = val;
+        this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
+      }, allowNone, 'dim'));
+    }
 
     const sep = document.createElement('span');
     sep.style.color = '#ccc';
     sep.innerText = '|';
     controlsContainer.appendChild(sep);
 
-    controlsContainer.appendChild(createSelect("Measure 1:", measureFields, this._selectedMeasures[0], (val) => {
-      this._selectedMeasures[0] = val;
-      this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, false, 'measure'));
-
-    controlsContainer.appendChild(createSelect("Measure 2:", measureFields, this._selectedMeasures[1], (val) => {
-      this._selectedMeasures[1] = val;
-      this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true, 'measure'));
-
-    controlsContainer.appendChild(createSelect("Measure 3:", measureFields, this._selectedMeasures[2], (val) => {
-      this._selectedMeasures[2] = val;
-      this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true, 'measure'));
-
-    controlsContainer.appendChild(createSelect("Measure 4:", measureFields, this._selectedMeasures[3], (val) => {
-      this._selectedMeasures[3] = val;
-      this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-    }, true, 'measure'));
+    // Dynamically render measure dropdowns according to pulled fields count
+    const numMeasuresToRender = Math.min(measureFields.length, 4);
+    for (let i = 0; i < numMeasuresToRender; i++) {
+      const label = `Measure ${i + 1}:`;
+      const allowNone = i > 0;
+      controlsContainer.appendChild(createSelect(label, measureFields, this._selectedMeasures[i], (val) => {
+        this._selectedMeasures[i] = val;
+        this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
+      }, allowNone, 'measure'));
+    }
   },
 
   processAndRenderData: function(data, dimFields, measureFields, config, element, queryResponse) {
@@ -784,7 +780,6 @@ looker.plugins.visualizations.add({
       headHtml += `<th rowspan="2" style="background-color: ${headerBg}; color: ${headerText}; vertical-align: bottom;">${groupHeaderHtml}</th>`;
 
       pivots.forEach(p => {
-        // Always extract clean "Month Day" string (e.g., "Sep 21")
         let pivotLabel = (p.data && Object.values(p.data).join(' / ')) || p.key;
         if (pivotLabel.includes('/')) {
           pivotLabel = pivotLabel.split('/')[0].trim();
