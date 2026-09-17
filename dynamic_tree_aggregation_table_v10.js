@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v10",
-  label: "Dynamic Tree Aggregation Table v10",
+  id: "dynamic_tree_aggregation_table_v11",
+  label: "dynamic_tree_aggregation_table_v11",
 
   max_limit: 50000,
 
@@ -167,13 +167,14 @@ looker.plugins.visualizations.add({
           position: sticky;
           z-index: 2;
         }
+        /* Normal border for pivot column separators */
         .custom-table th.pivot-hdr {
           text-align: center;
-          border-right: 2px solid #475569 !important;
+          border-right: 1px solid #c8d1dc !important;
         }
         .custom-table th.pivot-border-right,
         .custom-table td.pivot-border-right {
-          border-right: 2px solid #475569 !important;
+          border-right: 1px solid #c8d1dc !important;
         }
         .custom-table td {
           padding: 6px 12px;
@@ -185,7 +186,24 @@ looker.plugins.visualizations.add({
         .custom-table tr:nth-child(even) td {
           background-color: #f6f8fa;
         }
+        /* Sticky Left Column Fix for Freezing Dimensions */
+        .custom-table th:first-child,
+        .custom-table td:first-child {
+          position: sticky;
+          left: 0;
+          z-index: 6;
+          box-shadow: 2px 0 4px rgba(0,0,0,0.06);
+        }
+        .custom-table tr:nth-child(odd) td:first-child {
+          background-color: #ffffff;
+        }
+        .custom-table tr:nth-child(even) td:first-child {
+          background-color: #f6f8fa;
+        }
         .custom-table tr:hover td {
+          background-color: #eaf2ff;
+        }
+        .custom-table tr:hover td:first-child {
           background-color: #eaf2ff;
         }
         .text-right {
@@ -229,7 +247,10 @@ looker.plugins.visualizations.add({
           border-top: 2px solid #a0a0a0;
           position: sticky;
           bottom: 0;
-          z-index: 3;
+          z-index: 7;
+        }
+        .totals-row td:first-child {
+          z-index: 8;
         }
         .hdr-breadcrumb-container {
           display: flex;
@@ -336,7 +357,6 @@ looker.plugins.visualizations.add({
     done();
   },
 
-  // Helper method to resolve field custom labels based on Looker field index
   getResolvedFieldLabel: function(field, allFields, config, fieldType) {
     if (!field) return '';
     const index = allFields.findIndex(f => f.name === field.name);
@@ -374,7 +394,6 @@ looker.plugins.visualizations.add({
       optionsList.forEach(field => {
         const opt = document.createElement('option');
         opt.value = field.name;
-        // Dynamically resolve custom label for every field item in the dropdown
         opt.innerText = this.getResolvedFieldLabel(field, optionsList, config, fieldType);
         select.appendChild(opt);
       });
@@ -765,7 +784,11 @@ looker.plugins.visualizations.add({
       headHtml += `<th rowspan="2" style="background-color: ${headerBg}; color: ${headerText}; vertical-align: bottom;">${groupHeaderHtml}</th>`;
 
       pivots.forEach(p => {
-        const pivotLabel = (p.data && Object.values(p.data).join(' / ')) || p.key;
+        // Always extract clean "Month Day" string (e.g., "Sep 21")
+        let pivotLabel = (p.data && Object.values(p.data).join(' / ')) || p.key;
+        if (pivotLabel.includes('/')) {
+          pivotLabel = pivotLabel.split('/')[0].trim();
+        }
         headHtml += `<th colspan="${activeMeasures.length}" class="pivot-hdr" style="background-color: ${pivotHeaderBg}; color: ${pivotHeaderText};">${pivotLabel}</th>`;
       });
       headHtml += `</tr>`;
@@ -799,20 +822,20 @@ looker.plugins.visualizations.add({
         topRowThs.forEach(th => {
           th.style.position = 'sticky';
           th.style.top = '0px';
-          th.style.zIndex = '5';
+          th.style.zIndex = '10';
         });
 
         bottomRowThs.forEach(th => {
           th.style.position = 'sticky';
           th.style.top = `${row1Height}px`;
-          th.style.zIndex = '4';
+          th.style.zIndex = '9';
         });
       } else if (rows.length === 1) {
         const ths = rows[0].querySelectorAll('th');
         ths.forEach(th => {
           th.style.position = 'sticky';
           th.style.top = '0px';
-          th.style.zIndex = '5';
+          th.style.zIndex = '10';
         });
       }
     });
