@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v12",
-  label: "dynamic_tree_aggregation_table_v12",
+  id: "dynamic_tree_aggregation_table_v13",
+  label: "dynamic_tree_aggregation_table_v13",
 
   max_limit: 50000,
 
@@ -185,7 +185,7 @@ looker.plugins.visualizations.add({
         .custom-table tr:nth-child(even) td {
           background-color: #f6f8fa;
         }
-        /* Sticky Left Column Fix for Freezing Dimensions */
+        /* Sticky Left Column for Freezing Dimensions */
         .custom-table th:first-child,
         .custom-table td:first-child {
           position: sticky;
@@ -333,7 +333,6 @@ looker.plugins.visualizations.add({
         return;
       }
 
-      // Default Selections limited to pulled fields length
       const maxDimSlots = Math.min(dimFields.length, 3);
       for (let i = 0; i < 3; i++) {
         if (i < maxDimSlots) {
@@ -414,7 +413,6 @@ looker.plugins.visualizations.add({
       return group;
     };
 
-    // Dynamically render dimension dropdowns according to pulled fields count
     const numDimsToRender = Math.min(dimFields.length, 3);
     for (let i = 0; i < numDimsToRender; i++) {
       const label = `Dim ${i + 1}:`;
@@ -430,7 +428,6 @@ looker.plugins.visualizations.add({
     sep.innerText = '|';
     controlsContainer.appendChild(sep);
 
-    // Dynamically render measure dropdowns according to pulled fields count
     const numMeasuresToRender = Math.min(measureFields.length, 4);
     for (let i = 0; i < numMeasuresToRender; i++) {
       const label = `Measure ${i + 1}:`;
@@ -506,6 +503,8 @@ looker.plugins.visualizations.add({
 
     const rootNodes = new Map();
     const sumTotals = Array.from({ length: pivots.length }, () => new Array(activeMeasures.length).fill(0));
+    const pivotNum1Totals = new Array(pivots.length).fill(0);
+    const pivotNum2Totals = new Array(pivots.length).fill(0);
 
     (data || []).forEach(row => {
       let currentMap = rootNodes;
@@ -530,6 +529,9 @@ looker.plugins.visualizations.add({
       });
 
       pivotRowMeasures.forEach((pObj, pIdx) => {
+        pivotNum1Totals[pIdx] += pObj.valNum1;
+        pivotNum2Totals[pIdx] += pObj.valNum2;
+
         pObj.measures.forEach((mObj, mIdx) => {
           sumTotals[pIdx][mIdx] += mObj.num;
         });
@@ -585,17 +587,32 @@ looker.plugins.visualizations.add({
 
     const grandTotals = pivots.map((p, pIdx) => {
       return activeMeasures.map((m, mIdx) => {
-        if (measureMeta[mIdx].isPercent) return "—";
-
+        // Priority 1: Check Looker native totals_data response for percent and normal measures
         if (queryResponse && queryResponse.totals_data && queryResponse.totals_data[m.name]) {
           const tCell = hasPivots ? queryResponse.totals_data[m.name][p.key] : queryResponse.totals_data[m.name];
-          if (tCell && tCell.rendered !== undefined && tCell.rendered !== null) return tCell.rendered;
-          if (tCell && tCell.value !== undefined) {
+          if (tCell && tCell.rendered !== undefined && tCell.rendered !== null) {
+            return tCell.rendered;
+          }
+          if (tCell && tCell.value !== undefined && tCell.value !== null) {
             const v = Number(tCell.value);
+            if (measureMeta[mIdx].isPercent) {
+              const pctVal = v <= 1 && v >= -1 ? v * 100 : v;
+              return pctVal.toFixed(1) + '%';
+            }
             return measureMeta[mIdx].hasDecimals ? v.toLocaleString() : Math.round(v).toLocaleString();
           }
         }
 
+        // Priority 2: Standard percentage grand total fallback calculation
+        if (measureMeta[mIdx].isPercent) {
+          if (pivotNum2Totals[pIdx] > 0) {
+            const overallRatio = (pivotNum1Totals[pIdx] / pivotNum2Totals[pIdx]) * 100;
+            return overallRatio.toFixed(1) + '%';
+          }
+          return "—";
+        }
+
+        // Priority 3: Non-percent measure total calculation
         const totalVal = sumTotals[pIdx][mIdx];
         if (!measureMeta[mIdx].hasDecimals) {
           return Math.round(totalVal).toLocaleString();
