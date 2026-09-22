@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
   id: "dynamic_tree_aggregation_table_v13",
-  label: "Dynamic X Axis Table Chart v13",
+  label: "Dynamic tree aggregation table v13",
 
   max_limit: 50000,
 
@@ -120,9 +120,9 @@ looker.plugins.visualizations.add({
           margin-bottom: 12px;
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 10px;
           background: #f8f9fa;
-          padding: 8px 12px;
+          padding: 10px 14px;
           border-radius: 6px;
           border: 1px solid #e0e0e0;
           flex-shrink: 0;
@@ -130,20 +130,24 @@ looker.plugins.visualizations.add({
         .controls-row {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 20px;
           flex-wrap: wrap;
         }
         .control-group {
           display: flex;
           align-items: center;
           gap: 6px;
-          font-size: 12px;
+          font-size: 13px;
           font-weight: 600;
           color: #333;
         }
+        .control-group label {
+          min-width: 90px;
+          white-space: nowrap;
+        }
         .control-group select {
-          padding: 4px 8px;
-          font-size: 12px;
+          padding: 4px 10px;
+          font-size: 13px;
           border-radius: 4px;
           border: 1px solid #ccc;
           background: #fff;
@@ -186,19 +190,22 @@ looker.plugins.visualizations.add({
           border-bottom: 1px solid #e1e4e8;
           color: #212529;
           background: #fff;
+          box-sizing: border-box;
         }
         .custom-table tr:nth-child(even) td {
           background-color: #f6f8fa;
         }
-        /* Sticky & Expanded First Column for Freezing Dimensions */
+        /* Sticky Left Column with Widen Width for Dimensions */
         .custom-table th:first-child,
         .custom-table td:first-child {
           position: sticky;
           left: 0;
           z-index: 6;
-          min-width: 220px;
-          width: 220px;
+          width: 300px !important;
+          min-width: 300px !important;
+          max-width: 300px !important;
           box-shadow: 2px 0 4px rgba(0,0,0,0.06);
+          word-break: break-word;
         }
         .custom-table tr:nth-child(odd) td:first-child {
           background-color: #ffffff;
@@ -420,7 +427,7 @@ looker.plugins.visualizations.add({
       return group;
     };
 
-    // Row 1: Dimension Selectors
+    // Row 1: Dimensions
     const dimRow = document.createElement('div');
     dimRow.className = 'controls-row';
 
@@ -435,7 +442,7 @@ looker.plugins.visualizations.add({
     }
     controlsContainer.appendChild(dimRow);
 
-    // Row 2: Measure Selectors
+    // Row 2: Measures
     const measureRow = document.createElement('div');
     measureRow.className = 'controls-row';
 
@@ -599,7 +606,6 @@ looker.plugins.visualizations.add({
 
     const grandTotals = pivots.map((p, pIdx) => {
       return activeMeasures.map((m, mIdx) => {
-        // Priority 1: Check Looker native totals_data response
         if (queryResponse && queryResponse.totals_data && queryResponse.totals_data[m.name]) {
           const tCell = hasPivots ? queryResponse.totals_data[m.name][p.key] : queryResponse.totals_data[m.name];
           if (tCell && tCell.rendered !== undefined && tCell.rendered !== null) {
@@ -615,7 +621,6 @@ looker.plugins.visualizations.add({
           }
         }
 
-        // Priority 2: Standard percentage grand total fallback calculation
         if (measureMeta[mIdx].isPercent) {
           if (pivotNum2Totals[pIdx] > 0) {
             const overallRatio = (pivotNum1Totals[pIdx] / pivotNum2Totals[pIdx]) * 100;
@@ -624,7 +629,6 @@ looker.plugins.visualizations.add({
           return "—";
         }
 
-        // Priority 3: Non-percent measure total calculation
         const totalVal = sumTotals[pIdx][mIdx];
         if (!measureMeta[mIdx].hasDecimals) {
           return Math.round(totalVal).toLocaleString();
