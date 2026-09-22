@@ -1,5 +1,5 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v15",
+  id: "dynamic_tree_aggregation_table_v16",
   label: "Dynamic X Axis Table Chart v16",
 
   max_limit: 50000,
