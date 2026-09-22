@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
   id: "dynamic_tree_aggregation_table_v15",
-  label: "Dynamic Tree v15",
+  label: "Dynamic X Axis Table Chart v16",
 
   max_limit: 50000,
 
@@ -116,42 +116,46 @@ looker.plugins.visualizations.add({
           margin-bottom: 8px;
           flex-shrink: 0;
         }
+        /* Strict Grid Layout for Controls Alignment */
         .controls-bar {
           margin-bottom: 12px;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
+          display: grid;
+          grid-template-columns: repeat(4, max-content);
+          column-gap: 28px;
+          row-gap: 10px;
           background: #f8f9fa;
           padding: 10px 14px;
           border-radius: 6px;
           border: 1px solid #e0e0e0;
           flex-shrink: 0;
-        }
-        .controls-row {
-          display: flex;
           align-items: center;
-          gap: 20px;
-          flex-wrap: wrap;
         }
         .control-group {
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 8px;
           font-size: 13px;
           font-weight: 600;
           color: #333;
         }
         .control-group label {
-          min-width: 90px;
+          width: 95px;
+          min-width: 95px;
+          max-width: 95px;
           white-space: nowrap;
         }
         .control-group select {
-          padding: 4px 10px;
+          padding: 4px 8px;
           font-size: 13px;
           border-radius: 4px;
           border: 1px solid #ccc;
           background: #fff;
           cursor: pointer;
+          width: 180px;
+          min-width: 180px;
+          max-width: 180px;
+          box-sizing: border-box;
+          text-overflow: ellipsis;
         }
         .table-wrapper {
           flex: 1;
@@ -195,7 +199,7 @@ looker.plugins.visualizations.add({
         .custom-table tr:nth-child(even) td {
           background-color: #f6f8fa;
         }
-        /* Sticky Left Column with Widen Width for Dimensions */
+        /* Enforced First Column Width */
         .custom-table th:first-child,
         .custom-table td:first-child {
           position: sticky;
@@ -396,9 +400,10 @@ looker.plugins.visualizations.add({
     const controlsContainer = element.querySelector('#controls-bar');
     controlsContainer.innerHTML = '';
 
-    const createSelect = (staticLabel, optionsList, currentValue, onChange, allowNone = false, fieldType = 'dim') => {
+    const createSelect = (staticLabel, optionsList, currentValue, onChange, allowNone = false, fieldType = 'dim', gridStyle = '') => {
       const group = document.createElement('div');
       group.className = 'control-group';
+      if (gridStyle) group.style.cssText = gridStyle;
 
       const lbl = document.createElement('label');
       lbl.innerText = staticLabel;
@@ -427,35 +432,29 @@ looker.plugins.visualizations.add({
       return group;
     };
 
-    // Row 1: Dimensions
-    const dimRow = document.createElement('div');
-    dimRow.className = 'controls-row';
-
+    // Render Dimension Selectors (Row 1, Grid columns 1 to 3)
     const numDimsToRender = Math.min(dimFields.length, 3);
     for (let i = 0; i < numDimsToRender; i++) {
       const label = `Dimension ${i + 1}:`;
       const allowNone = i > 0;
-      dimRow.appendChild(createSelect(label, dimFields, this._selectedDims[i], (val) => {
+      const gridPosition = `grid-row: 1; grid-column: ${i + 1};`;
+      controlsContainer.appendChild(createSelect(label, dimFields, this._selectedDims[i], (val) => {
         this._selectedDims[i] = val;
         this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-      }, allowNone, 'dim'));
+      }, allowNone, 'dim', gridPosition));
     }
-    controlsContainer.appendChild(dimRow);
 
-    // Row 2: Measures
-    const measureRow = document.createElement('div');
-    measureRow.className = 'controls-row';
-
+    // Render Measure Selectors (Row 2, Grid columns 1 to 4)
     const numMeasuresToRender = Math.min(measureFields.length, 4);
     for (let i = 0; i < numMeasuresToRender; i++) {
       const label = `Measure ${i + 1}:`;
       const allowNone = i > 0;
-      measureRow.appendChild(createSelect(label, measureFields, this._selectedMeasures[i], (val) => {
+      const gridPosition = `grid-row: 2; grid-column: ${i + 1};`;
+      controlsContainer.appendChild(createSelect(label, measureFields, this._selectedMeasures[i], (val) => {
         this._selectedMeasures[i] = val;
         this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
-      }, allowNone, 'measure'));
+      }, allowNone, 'measure', gridPosition));
     }
-    controlsContainer.appendChild(measureRow);
   },
 
   processAndRenderData: function(data, dimFields, measureFields, config, element, queryResponse) {
