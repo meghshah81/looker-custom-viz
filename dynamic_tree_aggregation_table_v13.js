@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
   id: "dynamic_tree_aggregation_table_v13",
-  label: "dynamic_tree_aggregation_table_v13",
+  label: "Dynamic X Axis Table Chart v13",
 
   max_limit: 50000,
 
@@ -119,13 +119,18 @@ looker.plugins.visualizations.add({
         .controls-bar {
           margin-bottom: 12px;
           display: flex;
-          align-items: center;
-          gap: 12px;
+          flex-direction: column;
+          gap: 8px;
           background: #f8f9fa;
           padding: 8px 12px;
           border-radius: 6px;
           border: 1px solid #e0e0e0;
           flex-shrink: 0;
+        }
+        .controls-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
           flex-wrap: wrap;
         }
         .control-group {
@@ -185,12 +190,14 @@ looker.plugins.visualizations.add({
         .custom-table tr:nth-child(even) td {
           background-color: #f6f8fa;
         }
-        /* Sticky Left Column for Freezing Dimensions */
+        /* Sticky & Expanded First Column for Freezing Dimensions */
         .custom-table th:first-child,
         .custom-table td:first-child {
           position: sticky;
           left: 0;
           z-index: 6;
+          min-width: 220px;
+          width: 220px;
           box-shadow: 2px 0 4px rgba(0,0,0,0.06);
         }
         .custom-table tr:nth-child(odd) td:first-child {
@@ -413,30 +420,35 @@ looker.plugins.visualizations.add({
       return group;
     };
 
+    // Row 1: Dimension Selectors
+    const dimRow = document.createElement('div');
+    dimRow.className = 'controls-row';
+
     const numDimsToRender = Math.min(dimFields.length, 3);
     for (let i = 0; i < numDimsToRender; i++) {
-      const label = `Dim ${i + 1}:`;
+      const label = `Dimension ${i + 1}:`;
       const allowNone = i > 0;
-      controlsContainer.appendChild(createSelect(label, dimFields, this._selectedDims[i], (val) => {
+      dimRow.appendChild(createSelect(label, dimFields, this._selectedDims[i], (val) => {
         this._selectedDims[i] = val;
         this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
       }, allowNone, 'dim'));
     }
+    controlsContainer.appendChild(dimRow);
 
-    const sep = document.createElement('span');
-    sep.style.color = '#ccc';
-    sep.innerText = '|';
-    controlsContainer.appendChild(sep);
+    // Row 2: Measure Selectors
+    const measureRow = document.createElement('div');
+    measureRow.className = 'controls-row';
 
     const numMeasuresToRender = Math.min(measureFields.length, 4);
     for (let i = 0; i < numMeasuresToRender; i++) {
       const label = `Measure ${i + 1}:`;
       const allowNone = i > 0;
-      controlsContainer.appendChild(createSelect(label, measureFields, this._selectedMeasures[i], (val) => {
+      measureRow.appendChild(createSelect(label, measureFields, this._selectedMeasures[i], (val) => {
         this._selectedMeasures[i] = val;
         this.processAndRenderData(data, dimFields, measureFields, config, element, queryResponse);
       }, allowNone, 'measure'));
     }
+    controlsContainer.appendChild(measureRow);
   },
 
   processAndRenderData: function(data, dimFields, measureFields, config, element, queryResponse) {
@@ -587,7 +599,7 @@ looker.plugins.visualizations.add({
 
     const grandTotals = pivots.map((p, pIdx) => {
       return activeMeasures.map((m, mIdx) => {
-        // Priority 1: Check Looker native totals_data response for percent and normal measures
+        // Priority 1: Check Looker native totals_data response
         if (queryResponse && queryResponse.totals_data && queryResponse.totals_data[m.name]) {
           const tCell = hasPivots ? queryResponse.totals_data[m.name][p.key] : queryResponse.totals_data[m.name];
           if (tCell && tCell.rendered !== undefined && tCell.rendered !== null) {
