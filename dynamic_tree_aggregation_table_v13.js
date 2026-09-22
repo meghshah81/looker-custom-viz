@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v13",
-  label: "Dynamic tree aggregation table v13",
+  id: "dynamic_tree_aggregation_table_v14",
+  label: "dynamic_tree_aggregation_table_v14",
 
   max_limit: 50000,
 
