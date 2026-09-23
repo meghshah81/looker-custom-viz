@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v17",
-  label: "Dynamic X Axis Table Chart v17",
+  id: "dynamic_tree_aggregation_table_v18",
+  label: "Dynamic X Axis Table Chart v18",
 
   max_limit: 50000,
 
@@ -200,9 +200,8 @@ looker.plugins.visualizations.add({
         .custom-table tr:nth-child(even) td {
           background-color: #f6f8fa;
         }
-        /* Enforced First Column Width */
-        .custom-table th:first-child,
-        .custom-table td:first-child {
+        /* Target Sticky Dimension Column exclusively via class */
+        .custom-table .dim-col {
           position: sticky;
           left: 0;
           z-index: 6;
@@ -212,24 +211,24 @@ looker.plugins.visualizations.add({
           box-shadow: 2px 0 4px rgba(0,0,0,0.06);
           word-break: break-word;
         }
-        /* Equalized Measure Columns Width */
-        .custom-table th:not(:first-child),
-        .custom-table td:not(:first-child) {
-          width: 120px !important;
-          min-width: 120px !important;
-          max-width: 120px !important;
+        /* Target Measure Columns evenly */
+        .custom-table th:not(.dim-col),
+        .custom-table td:not(.dim-col) {
+          width: 110px !important;
+          min-width: 110px !important;
+          max-width: 110px !important;
           box-sizing: border-box;
         }
-        .custom-table tr:nth-child(odd) td:first-child {
+        .custom-table tr:nth-child(odd) td.dim-col {
           background-color: #ffffff;
         }
-        .custom-table tr:nth-child(even) td:first-child {
+        .custom-table tr:nth-child(even) td.dim-col {
           background-color: #f6f8fa;
         }
         .custom-table tr:hover td {
           background-color: #eaf2ff;
         }
-        .custom-table tr:hover td:first-child {
+        .custom-table tr:hover td.dim-col {
           background-color: #eaf2ff;
         }
         .text-right {
@@ -275,7 +274,7 @@ looker.plugins.visualizations.add({
           bottom: 0;
           z-index: 7;
         }
-        .totals-row td:first-child {
+        .totals-row td.dim-col {
           z-index: 8;
         }
         .hdr-breadcrumb-container {
@@ -706,6 +705,7 @@ looker.plugins.visualizations.add({
         tr.style.fontSize = `${fontSize}px`;
 
         const groupTd = document.createElement('td');
+        groupTd.className = 'dim-col'; // Assigned explicit dimension column class
         const flexDiv = document.createElement('div');
         flexDiv.className = 'tree-node-cell';
         flexDiv.style.paddingLeft = `${indentPx}px`;
@@ -818,7 +818,7 @@ looker.plugins.visualizations.add({
 
     if (hasPivots) {
       headHtml += `<tr style="font-size: ${fontSize}px;">`;
-      headHtml += `<th rowspan="2" style="background-color: ${headerBg}; color: ${headerText}; vertical-align: bottom;">${groupHeaderHtml}</th>`;
+      headHtml += `<th rowspan="2" class="dim-col" style="background-color: ${headerBg}; color: ${headerText}; vertical-align: bottom;">${groupHeaderHtml}</th>`;
 
       pivots.forEach(p => {
         let pivotLabel = (p.data && Object.values(p.data).join(' / ')) || p.key;
@@ -839,7 +839,7 @@ looker.plugins.visualizations.add({
       headHtml += `</tr>`;
     } else {
       headHtml += `<tr style="font-size: ${fontSize}px;">`;
-      headHtml += `<th style="background-color: ${headerBg}; color: ${headerText};">${groupHeaderHtml}</th>`;
+      headHtml += `<th class="dim-col" style="background-color: ${headerBg}; color: ${headerText};">${groupHeaderHtml}</th>`;
       activeMeasures.forEach(m => {
         headHtml += `<th class="text-right" style="background-color: ${headerBg}; color: ${headerText};">${m.displayLabel}</th>`;
       });
@@ -878,7 +878,7 @@ looker.plugins.visualizations.add({
 
     const footEl = element.querySelector('#table-foot');
     let footHtml = `<tr class="totals-row" style="font-size: ${fontSize}px;">`;
-    footHtml += `<td>Totals</td>`;
+    footHtml += `<td class="dim-col">Totals</td>`;
 
     pivots.forEach((_, pIdx) => {
       activeMeasures.forEach((_, mIdx) => {
