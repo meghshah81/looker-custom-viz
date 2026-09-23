@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v16",
-  label: "Dynamic X Axis Table Chart v16",
+  id: "dynamic_tree_aggregation_table_v17",
+  label: "Dynamic X Axis Table Chart v17",
 
   max_limit: 50000,
 
@@ -169,6 +169,7 @@ looker.plugins.visualizations.add({
           border-collapse: separate;
           border-spacing: 0;
           font-size: 13px;
+          table-layout: fixed;
         }
         .custom-table th {
           text-align: left;
@@ -210,6 +211,14 @@ looker.plugins.visualizations.add({
           max-width: 300px !important;
           box-shadow: 2px 0 4px rgba(0,0,0,0.06);
           word-break: break-word;
+        }
+        /* Equalized Measure Columns Width */
+        .custom-table th:not(:first-child),
+        .custom-table td:not(:first-child) {
+          width: 120px !important;
+          min-width: 120px !important;
+          max-width: 120px !important;
+          box-sizing: border-box;
         }
         .custom-table tr:nth-child(odd) td:first-child {
           background-color: #ffffff;
