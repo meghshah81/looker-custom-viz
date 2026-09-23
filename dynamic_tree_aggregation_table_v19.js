@@ -1,6 +1,6 @@
 looker.plugins.visualizations.add({
-  id: "dynamic_tree_aggregation_table_v18",
-  label: "Dynamic X Axis Table Chart v18",
+  id: "dynamic_tree_aggregation_table_v19",
+  label: "Dynamic X Axis Table Chart v19",
 
   max_limit: 50000,
 
@@ -165,11 +165,11 @@ looker.plugins.visualizations.add({
           position: relative;
         }
         .custom-table {
-          width: 100%;
+          width: max-content;
+          min-width: 100%;
           border-collapse: separate;
           border-spacing: 0;
           font-size: 13px;
-          table-layout: fixed;
         }
         .custom-table th {
           text-align: left;
@@ -200,24 +200,28 @@ looker.plugins.visualizations.add({
         .custom-table tr:nth-child(even) td {
           background-color: #f6f8fa;
         }
-        /* Target Sticky Dimension Column exclusively via class */
+        /* Sticky Dimension Column Setup */
         .custom-table .dim-col {
           position: sticky;
           left: 0;
           z-index: 6;
-          width: 300px !important;
-          min-width: 300px !important;
-          max-width: 300px !important;
-          box-shadow: 2px 0 4px rgba(0,0,0,0.06);
+          width: 260px !important;
+          min-width: 260px !important;
+          max-width: 260px !important;
+          box-shadow: 2px 0 4px rgba(0,0,0,0.08);
           word-break: break-word;
         }
-        /* Target Measure Columns evenly */
+        /* Responsive Clean Measure Columns */
         .custom-table th:not(.dim-col),
         .custom-table td:not(.dim-col) {
-          width: 110px !important;
-          min-width: 110px !important;
-          max-width: 110px !important;
+          min-width: 95px;
+          padding: 6px 12px;
+          white-space: nowrap;
           box-sizing: border-box;
+        }
+        .custom-table th:not(.dim-col) {
+          white-space: normal;
+          word-break: break-word;
         }
         .custom-table tr:nth-child(odd) td.dim-col {
           background-color: #ffffff;
@@ -440,7 +444,7 @@ looker.plugins.visualizations.add({
       return group;
     };
 
-    // Render Dimension Selectors (Row 1, Grid columns 1 to 3)
+    // Render Dimension Selectors
     const numDimsToRender = Math.min(dimFields.length, 3);
     for (let i = 0; i < numDimsToRender; i++) {
       const label = `Dimension ${i + 1}:`;
@@ -452,7 +456,7 @@ looker.plugins.visualizations.add({
       }, allowNone, 'dim', gridPosition));
     }
 
-    // Render Measure Selectors (Row 2, Grid columns 1 to 4)
+    // Render Measure Selectors
     const numMeasuresToRender = Math.min(measureFields.length, 4);
     for (let i = 0; i < numMeasuresToRender; i++) {
       const label = `Measure ${i + 1}:`;
@@ -705,7 +709,7 @@ looker.plugins.visualizations.add({
         tr.style.fontSize = `${fontSize}px`;
 
         const groupTd = document.createElement('td');
-        groupTd.className = 'dim-col'; // Assigned explicit dimension column class
+        groupTd.className = 'dim-col';
         const flexDiv = document.createElement('div');
         flexDiv.className = 'tree-node-cell';
         flexDiv.style.paddingLeft = `${indentPx}px`;
