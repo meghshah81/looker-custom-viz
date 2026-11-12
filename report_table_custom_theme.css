@@ -1,0 +1,38 @@
+/*
+  Custom CSS for Looker Report Table Custom Visualization
+  Styles headers with a deep navy blue background and white text with crisp borders.
+*/
+
+/* 1. Main Header cells (Dimensions, Measures) */
+.rt-table th,
+.rt-th,
+.rt-header-row th {
+    background-color: #12326D !important;
+    color: #FFFFFF !important;
+    font-family: inherit;
+    font-weight: bold !important;
+    text-align: center !important;
+    border: 1px solid #FFFFFF !important; /* White borders between header cells */
+    vertical-align: middle !important;
+}
+
+/* 2. Grouped Super-Headers (Headings) */
+.rt-heading, 
+.rt-super-header,
+.rt-table tr.rt-header-row:first-child th {
+    background-color: #12326D !important;
+    color: #FFFFFF !important;
+    font-family: inherit;
+    font-weight: bold !important;
+    text-align: center !important;
+    border: 1px solid #FFFFFF !important; /* White borders between header cells */
+    vertical-align: middle !important;
+}
+
+/* 3. Ensure the text inside active links (if any) is also white */
+.rt-table th a,
+.rt-th a,
+.rt-super-header a {
+    color: #FFFFFF !important;
+    text-decoration: none !important;
+}
