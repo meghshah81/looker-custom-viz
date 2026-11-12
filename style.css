@@ -1,0 +1,66 @@
+/* =========================================================================
+   1. BASE LOOKER THEME (Preserves all standard cell styles, fonts & zebra striping)
+   ========================================================================= */
+.rt-table th, .rt-th {
+  font-family: Open Sans, Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: #3a3f4b;
+  background-color: #ffffff;
+  padding: 8px 10px;
+  border-bottom: 1px solid #ccd1d9;
+}
+.rt-table td, .rt-td {
+  font-family: Open Sans, Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  color: #3a3f4b;
+  padding: 6px 10px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e6e9ee;
+}
+.rt-striped tr:nth-of-type(even) td {
+  background-color: #f5f7fa;
+}
+.rt-total, .rt-subtotal {
+  font-weight: 600;
+  background-color: #f5f7fa !important;
+}
+
+/* =========================================================================
+   2. CUSTOM OVERRIDES (Changes ONLY the headers to Deep Navy Blue & White)
+   ========================================================================= */
+
+/* Main Header Container & Cells */
+.rt-table th, 
+.rt-th, 
+.rt-header-row th {
+    background-color: #12326D !important;
+    background: #12326D !important;
+    color: #FFFFFF !important;
+    font-weight: bold !important;
+    text-align: center !important;
+    border: 1px solid #FFFFFF !important; /* Thin white borders between header cells */
+    vertical-align: middle !important;
+    padding: 10px !important;
+}
+
+/* Grouped Super-Headers (Headings) */
+.rt-heading, 
+.rt-super-header,
+.rt-table tr.rt-header-row:first-child th {
+    background-color: #12326D !important;
+    background: #12326D !important;
+    color: #FFFFFF !important;
+    font-weight: bold !important;
+    text-align: center !important;
+    border: 1px solid #FFFFFF !important;
+    vertical-align: middle !important;
+}
+
+/* Text links in headers (if active) */
+.rt-table th a, 
+.rt-th a, 
+.rt-super-header a {
+    color: #FFFFFF !important;
+    text-decoration: none !important;
+}
