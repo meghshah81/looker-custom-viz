@@ -1,38 +1,48 @@
-/*
-  Custom CSS for Looker Report Table Custom Visualization
-  Styles headers with a deep navy blue background and white text with crisp borders.
-*/
+/* ==============================================================
+   Looker Marketplace Report Table: Custom Navy Header Theme
+   ============================================================== */
 
-/* 1. Main Header cells (Dimensions, Measures) */
+/* 1. Header Container & Groupings */
+.tabulator .tabulator-header,
+.tabulator .tabulator-header .tabulator-col,
+.tabulator .tabulator-header .tabulator-col.tabulator-col-group,
+.tabulator .tabulator-col-group-cols {
+    background-color: #12326D !important;
+    background: #12326D !important;
+    border-color: #FFFFFF !important;
+}
+
+/* 2. Header Cell Content & Text */
+.tabulator .tabulator-header .tabulator-col .tabulator-col-content {
+    background-color: #12326D !important;
+    background: #12326D !important;
+    color: #FFFFFF !important;
+    font-weight: bold !important;
+    text-align: center !important;
+}
+
+/* 3. Column Title Text & Sort Arrows */
+.tabulator .tabulator-header .tabulator-col .tabulator-col-title {
+    color: #FFFFFF !important;
+    font-weight: bold !important;
+}
+
+.tabulator .tabulator-header .tabulator-col .tabulator-arrow {
+    border-bottom-color: #FFFFFF !important;
+    border-top-color: #FFFFFF !important;
+}
+
+/* 4. White Borders between header cells */
+.tabulator .tabulator-header .tabulator-col {
+    border-right: 1px solid #FFFFFF !important;
+    border-bottom: 1px solid #FFFFFF !important;
+}
+
+/* Fallback for regular HTML table rendering */
 .rt-table th,
 .rt-th,
-.rt-header-row th {
+th {
     background-color: #12326D !important;
     color: #FFFFFF !important;
-    font-family: inherit;
-    font-weight: bold !important;
-    text-align: center !important;
-    border: 1px solid #FFFFFF !important; /* White borders between header cells */
-    vertical-align: middle !important;
-}
-
-/* 2. Grouped Super-Headers (Headings) */
-.rt-heading, 
-.rt-super-header,
-.rt-table tr.rt-header-row:first-child th {
-    background-color: #12326D !important;
-    color: #FFFFFF !important;
-    font-family: inherit;
-    font-weight: bold !important;
-    text-align: center !important;
-    border: 1px solid #FFFFFF !important; /* White borders between header cells */
-    vertical-align: middle !important;
-}
-
-/* 3. Ensure the text inside active links (if any) is also white */
-.rt-table th a,
-.rt-th a,
-.rt-super-header a {
-    color: #FFFFFF !important;
-    text-decoration: none !important;
+    border: 1px solid #FFFFFF !important;
 }
