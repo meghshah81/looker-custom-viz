@@ -1,48 +1,31 @@
-/* ==============================================================
-   Looker Marketplace Report Table: Custom Navy Header Theme
-   ============================================================== */
+/* =======================================================
+   Looker Report Table - Header Background & Text Color Only
+   ======================================================= */
 
-/* 1. Header Container & Groupings */
+/* 1. Header container & columns */
 .tabulator .tabulator-header,
 .tabulator .tabulator-header .tabulator-col,
-.tabulator .tabulator-header .tabulator-col.tabulator-col-group,
-.tabulator .tabulator-col-group-cols {
-    background-color: #12326D !important;
-    background: #12326D !important;
-    border-color: #FFFFFF !important;
+.tabulator .tabulator-header .tabulator-col-content {
+  background-color: #12326D !important;
+  background: #12326D !important;
+  color: #FFFFFF !important;
 }
 
-/* 2. Header Cell Content & Text */
-.tabulator .tabulator-header .tabulator-col .tabulator-col-content {
-    background-color: #12326D !important;
-    background: #12326D !important;
-    color: #FFFFFF !important;
-    font-weight: bold !important;
-    text-align: center !important;
+/* 2. Header text / labels */
+.tabulator .tabulator-header .tabulator-col .tabulator-col-title,
+.tabulator .tabulator-header .tabulator-col .tabulator-col-title * {
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
 }
 
-/* 3. Column Title Text & Sort Arrows */
-.tabulator .tabulator-header .tabulator-col .tabulator-col-title {
-    color: #FFFFFF !important;
-    font-weight: bold !important;
-}
-
-.tabulator .tabulator-header .tabulator-col .tabulator-arrow {
-    border-bottom-color: #FFFFFF !important;
-    border-top-color: #FFFFFF !important;
-}
-
-/* 4. White Borders between header cells */
+/* 3. Header borders & dividers */
 .tabulator .tabulator-header .tabulator-col {
-    border-right: 1px solid #FFFFFF !important;
-    border-bottom: 1px solid #FFFFFF !important;
+  border-right: 1px solid #FFFFFF !important;
+  border-bottom: 1px solid #FFFFFF !important;
 }
 
-/* Fallback for regular HTML table rendering */
-.rt-table th,
-.rt-th,
-th {
-    background-color: #12326D !important;
-    color: #FFFFFF !important;
-    border: 1px solid #FFFFFF !important;
+/* 4. Sort arrows (if enabled) */
+.tabulator .tabulator-header .tabulator-arrow {
+  border-bottom-color: #FFFFFF !important;
+  border-top-color: #FFFFFF !important;
 }
